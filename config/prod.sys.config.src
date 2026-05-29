@@ -1,0 +1,52 @@
+%% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%%
+%% Production config, env-var driven (relx substitutes ${VAR} in this .src at
+%% boot). The PostgreSQL values are injected by Clever Cloud's PostgreSQL add-on.
+%% NOVA_PORT / MCP_PORT are set by entrypoint.sh from BANTO_ROLE + $PORT, so the
+%% public listener (whichever the role selects) binds Clever's routed port.
+
+[
+    {kernel, [{logger_level, info}]},
+    {pg_types, [{uuid_format, string}]},
+    {bunko, [{embedding_dim, ${EMBEDDING_DIM}}]},
+    {kura, [
+        {dialect, kura_dialect_pg},
+        {repos, #{
+            banto_repo => #{
+                pool_module => kura_pool_pgo,
+                driver_module => kura_driver_pgo,
+                hostname => ~"${POSTGRESQL_ADDON_HOST}",
+                port => ${POSTGRESQL_ADDON_PORT},
+                database => ~"${POSTGRESQL_ADDON_DB}",
+                username => ~"${POSTGRESQL_ADDON_USER}",
+                password => ~"${POSTGRESQL_ADDON_PASSWORD}",
+                pool_size => 10
+            }
+        }}
+    ]},
+    {nova, [
+        {environment, prod},
+        {cowboy_configuration, #{port => ${NOVA_PORT}}},
+        {bootstrap_application, banto},
+        {plugins, [
+            {pre_request, nova_request_plugin, #{decode_json_body => false}}
+        ]}
+    ]},
+    {banto, [
+        {repo, banto_repo},
+        {namespace, ~"${BANTO_NAMESPACE}"},
+        {mcp_port, ${MCP_PORT}},
+        {model, ~"${BANTO_MODEL}"},
+        {embedder,
+            {banto_embedder, #{
+                base_url => ~"${SEKISHO_BASE_URL}/openai",
+                api_key => ~"${SEKISHO_EMBED_KEY}",
+                model => ~"${EMBED_MODEL}"
+            }}},
+        {llm,
+            {gakudan_llm_anthropic, #{
+                base_url => ~"${SEKISHO_BASE_URL}/anthropic",
+                api_key => ~"${SEKISHO_LLM_KEY}"
+            }}}
+    ]}
+].
