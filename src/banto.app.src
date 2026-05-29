@@ -1,0 +1,27 @@
+{application, banto, [
+    {description,
+        "Multi-agent repo concierge for the BEAM - the gakudan ecosystem showcase consumer"},
+    {vsn, git},
+    {registered, []},
+    {mod, {banto_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto,
+        public_key,
+        ssl,
+        inets,
+        %% pgo + kura_postgres must start before kura: kura is driver-agnostic
+        %% and starts its pools at boot, which needs the pgo pool supervisor up.
+        pgo,
+        kura_postgres,
+        kura,
+        gakudan,
+        madoguchi,
+        bunko
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/Taure/banto"}]}
+]}.

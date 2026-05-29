@@ -1,0 +1,40 @@
+%% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+
+[
+    {kernel, [
+        {logger_level, info}
+    ]},
+    {pg_types, [{uuid_format, string}]},
+    {bunko, [
+        {embedding_dim, 1536}
+    ]},
+    {kura, [
+        {dialect, kura_dialect_pg},
+        {repos, #{
+            banto_repo => #{
+                pool_module => kura_pool_pgo,
+                driver_module => kura_driver_pgo,
+                database => ~"banto_dev",
+                hostname => ~"localhost",
+                port => 5559,
+                username => ~"postgres",
+                password => ~"root",
+                pool_size => 10
+            }
+        }}
+    ]},
+    {banto, [
+        {repo, banto_repo},
+        {namespace, ~"banto"},
+        {mcp_port, 8080},
+        %% Offline defaults. For real use, route through a sekisho gateway:
+        %%   {embedder, {banto_embedder, #{base_url => ~"http://sekisho/openai",
+        %%                                 api_key => ~"sk-sekisho-...",
+        %%                                 model => ~"text-embedding-3-small"}}},
+        %%   {llm, {gakudan_llm_anthropic, #{base_url => ~"http://sekisho/anthropic",
+        %%                                   api_key => ~"sk-sekisho-..."}}},
+        {embedder, bunko_embedder_stub},
+        {llm, {gakudan_llm_stub, #{}}},
+        {model, ~"claude-sonnet-4-6"}
+    ]}
+].
