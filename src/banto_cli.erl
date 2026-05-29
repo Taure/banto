@@ -7,6 +7,7 @@ banto_cli index <path> <name>   # index a repo into the shared memory
 banto_cli recall <query>        # semantic search across indexed repos
 banto_cli ask <question>        # grounded answer across indexed repos
 banto_cli review <diff-file>    # run the review swarm over a diff
+banto_cli maintain <path> <name> # dependency + doc-drift maintenance report
 ```
 
 Reads the same `banto` app configuration as the service (see `m:banto_config`);
@@ -32,12 +33,14 @@ main(Args) ->
         {index, string(), binary()}
         | {recall, binary()}
         | {ask, binary()}
-        | {review, string()}}
+        | {review, string()}
+        | {maintain, string(), binary()}}
     | {error, usage}.
 parse(["index", Path, Name]) -> {ok, {index, Path, list_to_binary(Name)}};
 parse(["recall", Query]) -> {ok, {recall, list_to_binary(Query)}};
 parse(["ask", Question]) -> {ok, {ask, list_to_binary(Question)}};
 parse(["review", File]) -> {ok, {review, File}};
+parse(["maintain", Path, Name]) -> {ok, {maintain, Path, list_to_binary(Name)}};
 parse(_) -> {error, usage}.
 
 %% --- dispatch ---
@@ -79,7 +82,11 @@ run({review, File}) ->
             end;
         {error, Reason} ->
             fail(Reason)
-    end.
+    end;
+run({maintain, Path, Name}) ->
+    {ok, Report} = banto_maintenance:run(Path, #{repo => Name}),
+    io:format("~s~n", [Report]),
+    0.
 
 fail(Reason) ->
     io:format(standard_error, "banto: error: ~p~n", [Reason]),
@@ -90,4 +97,5 @@ usage() ->
     "  index <path> <name>   index a repo into the shared memory\n"
     "  recall <query>        semantic search across indexed repos\n"
     "  ask <question>        grounded answer across indexed repos\n"
-    "  review <diff-file>    run the review swarm over a diff\n".
+    "  review <diff-file>    run the review swarm over a diff\n"
+    "  maintain <path> <name>  dependency + doc-drift maintenance report\n".

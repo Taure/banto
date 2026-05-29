@@ -19,3 +19,4 @@ a merged ADR - supersede it.
 | --- | --- |
 | [0001](0001-architecture.md) | Architecture and pillar wiring |
 | [0002](0002-review-swarm.md) | PR review swarm via gakudan fanout |
+| [0003](0003-maintenance.md) | Nightly maintenance: deterministic deps + LLM doc-drift |

@@ -1,13 +1,23 @@
 -module(banto_review_SUITE).
 
 -export([all/0, init_per_suite/1]).
--export([swarm_returns_all_reviews/1, security_reviewer_catches_injection/1, saiten_gate_passes/1]).
+-export([
+    swarm_returns_all_reviews/1,
+    security_reviewer_catches_injection/1,
+    saiten_gate_passes/1,
+    maintenance_report/1
+]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 all() ->
-    [swarm_returns_all_reviews, security_reviewer_catches_injection, saiten_gate_passes].
+    [
+        swarm_returns_all_reviews,
+        security_reviewer_catches_injection,
+        saiten_gate_passes,
+        maintenance_report
+    ].
 
 init_per_suite(Config) ->
     application:set_env(bunko, embedding_dim, 8),
@@ -42,3 +52,16 @@ security_reviewer_catches_injection(_Config) ->
 saiten_gate_passes(_Config) ->
     %% Runs the swarm over the planted-bug dataset and gates on the scorecard.
     ?assertEqual(ok, saiten:assert_passed(saiten:run(banto_review_eval:suite()))).
+
+maintenance_report(Config) ->
+    Dir = filename:join(?config(priv_dir, Config), "maint_repo"),
+    ok = filelib:ensure_dir(filename:join(Dir, "x")),
+    ok = file:write_file(
+        filename:join(Dir, "rebar.config"),
+        ~"{deps, [{kura, {git, \"u\", {tag, \"v2.0.6\"}}}, {flaky, {git, \"u\", {branch, \"main\"}}}]}.\n"
+    ),
+    {ok, Report} = banto_maintenance:run(Dir, #{repo => ~"maint"}),
+    %% deterministic dep finding
+    ?assertNotEqual(nomatch, binary:match(Report, ~"flaky (branch: main)")),
+    %% doc-drift agent ran (stub docs persona)
+    ?assertNotEqual(nomatch, binary:match(Report, ~"README references")).

@@ -100,6 +100,41 @@ cli_parse_ask_test() ->
 cli_parse_review_test() ->
     ?assertEqual({ok, {review, "d.diff"}}, banto_cli:parse(["review", "d.diff"])).
 
+cli_parse_maintain_test() ->
+    ?assertEqual({ok, {maintain, "/p", ~"kura"}}, banto_cli:parse(["maintain", "/p", "kura"])).
+
+%% --- banto_dep_audit ---
+
+dep_audit_flags_branch_test() ->
+    Deps = [
+        {a, {git, "u", {tag, "v1"}}},
+        {b, {git, "u", {branch, "main"}}},
+        {c, "1.0.0"}
+    ],
+    ?assertEqual(
+        [#{dep => b, issue => unpinned_branch, detail => "main"}],
+        banto_dep_audit:findings(Deps)
+    ).
+
+dep_audit_clean_format_test() ->
+    ?assertEqual(
+        ~"No dependency issues: every dependency is pinned.",
+        banto_dep_audit:format([])
+    ).
+
+dep_audit_finding_format_test() ->
+    Out = banto_dep_audit:format([#{dep => b, issue => unpinned_branch, detail => ~"main"}]),
+    ?assertNotEqual(nomatch, binary:match(Out, ~"b (branch: main)")).
+
+maintenance_format_test() ->
+    Report = banto_maintenance:format(
+        [#{dep => b, issue => unpinned_branch, detail => ~"main"}],
+        ~"docs look fine"
+    ),
+    ?assertNotEqual(nomatch, binary:match(Report, ~"maintenance report")),
+    ?assertNotEqual(nomatch, binary:match(Report, ~"branch: main")),
+    ?assertNotEqual(nomatch, binary:match(Report, ~"docs look fine")).
+
 cli_parse_usage_test() ->
     ?assertEqual({error, usage}, banto_cli:parse(["bogus"])),
     ?assertEqual({error, usage}, banto_cli:parse([])).

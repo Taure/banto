@@ -10,7 +10,7 @@ This is where gakudan's orchestration earns its keep: parallel specialist
 perspectives on one diff, not a single prompt.
 """.
 
--export([review/2, agents/0, build_kickoff/2, format/1, reviews/1]).
+-export([review/2, agents/0, build_kickoff/2, format/1]).
 
 -define(AGENTS, [
     banto_reviewer_security,
@@ -18,7 +18,6 @@ perspectives on one diff, not a single prompt.
     banto_reviewer_tests,
     banto_reviewer_architecture
 ]).
--define(TIMEOUT, 120_000).
 
 -doc "The reviewer agents in the swarm.".
 -spec agents() -> [module()].
@@ -33,31 +32,7 @@ entry per reviewer: `#{agent := atom(), content := binary()}`.
 review(Diff, Opts) ->
     Hits = recall_context(Diff, Opts),
     Kickoff = build_kickoff(Diff, Hits),
-    case
-        gakudan:start_run(#{
-            agents => ?AGENTS,
-            router => {gakudan_router_fanout, #{rounds => 1}},
-            llm => banto_config:llm(),
-            max_turns => length(?AGENTS) + 2
-        })
-    of
-        {ok, _Pid, RunId} ->
-            ok = gakudan:send(RunId, Kickoff),
-            Result =
-                case gakudan:await(RunId, maps:get(timeout, Opts, ?TIMEOUT)) of
-                    {ok, Entries} -> {ok, reviews(Entries)};
-                    {error, _} = Err -> Err
-                end,
-            _ = gakudan:stop(RunId),
-            Result;
-        {error, _} = Err ->
-            Err
-    end.
-
--doc "Extract per-agent review entries from a run's blackboard transcript.".
--spec reviews([map()]) -> [map()].
-reviews(Entries) ->
-    [#{agent => A, content => content_text(C)} || #{role := {agent, A}, content := C} <- Entries].
+    banto_run:run(?AGENTS, Kickoff, Opts).
 
 -doc "Build the swarm kickoff message: recalled context + the diff.".
 -spec build_kickoff(binary(), [bunko_store:hit()]) -> binary().
@@ -97,8 +72,3 @@ recall_context(Diff, Opts) ->
 %% The head of the diff (changed paths + first hunks) is the recall query.
 recall_query(Diff) ->
     binary:part(Diff, 0, min(byte_size(Diff), 2000)).
-
-content_text(C) when is_binary(C) ->
-    C;
-content_text(Blocks) when is_list(Blocks) ->
-    iolist_to_binary([T || #{type := text, text := T} <- Blocks]).

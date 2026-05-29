@@ -20,13 +20,15 @@ persona(Sys) ->
             has(Sys, ~"SECURITY"),
             has(Sys, ~"CONVENTIONS"),
             has(Sys, ~"TESTS"),
-            has(Sys, ~"ARCHITECTURE")
+            has(Sys, ~"ARCHITECTURE"),
+            has(Sys, ~"DOCS")
         }
     of
-        {true, _, _, _} -> security;
-        {_, true, _, _} -> conventions;
-        {_, _, true, _} -> tests;
-        {_, _, _, true} -> architecture;
+        {true, _, _, _, _} -> security;
+        {_, true, _, _, _} -> conventions;
+        {_, _, true, _, _} -> tests;
+        {_, _, _, true, _} -> architecture;
+        {_, _, _, _, true} -> docs;
         _ -> unknown
     end.
 
@@ -47,6 +49,8 @@ respond(tests, Diff) ->
     end;
 respond(architecture, _Diff) ->
     ~"No architectural concerns.";
+respond(docs, _Ctx) ->
+    ~"FINDING: README references a removed function; status section is stale.";
 respond(unknown, _Diff) ->
     ~"".
 

@@ -42,8 +42,12 @@ metadata, so recall spans every repo and a `repo` filter narrows it.
 - **P2 (done):** PR review swarm (gakudan fanout grounded by bunko recall),
   saiten CI gate (`banto_review_eval`), the `banto_cli` escript, an opt-in
   GitHub Action.
-- **P3:** nightly maintenance agents (dep/doc drift) + a Nova + Datastar
-  dashboard (same stack as gakudan_liveboard, not Arizona).
+- **P3a (done):** nightly maintenance - `banto_dep_audit` (deterministic) +
+  `banto_maintainer_docs` (gakudan doc-drift agent), combined by
+  `banto_maintenance`, surfaced via the `maintain` CLI subcommand and a scheduled
+  GitHub Action that opens an issue.
+- **P3b:** a Nova + Datastar dashboard (same stack as gakudan_liveboard, not
+  Arizona).
 
 ## Commands
 
