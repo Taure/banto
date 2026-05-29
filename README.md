@@ -27,6 +27,10 @@ it.
 - `banto_knowledge` recalls the most relevant chunks for a question and
   synthesises a grounded answer (with source citations) via the configured LLM.
 - `banto_mcp_*` exposes `recall`, `ask`, and `index_repo` over Streamable HTTP.
+- `banto_review` fans out specialist reviewer agents (security, conventions,
+  tests, architecture) over a diff via gakudan, each grounded by the same
+  recalled context; `banto_review_eval` is a saiten benchmark that gates the
+  swarm in CI.
 
 ## Quick start
 
@@ -40,10 +44,13 @@ ok = banto:ensure_schema().
 {ok, _} = banto:index("/path/to/kura", #{name => ~"kura"}).
 {ok, Hits} = banto:recall(~"how is the connection pool configured?", #{limit => 5}).
 {ok, Answer} = banto:ask(~"what does kura_query:where/2 expect?", #{repo => ~"kura"}).
+{ok, Reviews} = banto_review:review(Diff, #{repo => ~"kura"}), banto_review:format(Reviews).
 ```
 
 The MCP server starts on `:8080` at `/mcp`; point your Claude Code MCP config at
-it to use the tools directly.
+it to use the tools directly. A CLI (`rebar3 escriptize` -> `banto_cli
+review|ask|recall|index`) and an opt-in PR-review GitHub Action are also
+included.
 
 ## Configuration
 
@@ -53,8 +60,9 @@ use, route through a [sekisho](https://github.com/Taure/sekisho) gateway - see
 
 ## Status
 
-P1: cross-repo indexing, recall, ask, and the MCP surface. P2 (PR review swarm +
-CLI + GitHub Action) and P3 (nightly maintenance + dashboard) are on the roadmap.
+P1 (cross-repo indexing, recall, ask, MCP surface) and P2 (PR review swarm +
+saiten gate + CLI + GitHub Action) are done. P3 (nightly maintenance agents + a
+Nova + Datastar dashboard) is on the roadmap.
 
 ## License
 

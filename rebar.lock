@@ -26,6 +26,10 @@
  {<<"pg_types">>,{pkg,<<"pg_types">>,<<"0.6.0">>},2},
  {<<"pgo">>,{pkg,<<"pgo">>,<<"0.20.0">>},1},
  {<<"ranch">>,{pkg,<<"ranch">>,<<"2.2.0">>},2},
+ {<<"saiten">>,
+  {git,"https://github.com/Taure/saiten.git",
+       {ref,"6192e3a9d2b2aabb1d49b66fce87d1a493b1f283"}},
+  0},
  {<<"telemetry">>,{pkg,<<"telemetry">>,<<"1.3.0">>},1}]}.
 [
 {pkg_hash,[

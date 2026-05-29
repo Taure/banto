@@ -18,7 +18,8 @@
         kura,
         gakudan,
         madoguchi,
-        bunko
+        bunko,
+        saiten
     ]},
     {env, []},
     {modules, []},

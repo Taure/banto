@@ -18,3 +18,4 @@ a merged ADR - supersede it.
 | ADR | Title |
 | --- | --- |
 | [0001](0001-architecture.md) | Architecture and pillar wiring |
+| [0002](0002-review-swarm.md) | PR review swarm via gakudan fanout |
