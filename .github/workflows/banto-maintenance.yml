@@ -1,0 +1,84 @@
+name: banto maintenance
+
+# Nightly self-maintenance: index this repo, run the dependency + doc-drift
+# report, and open an issue with the result. Needs a sekisho gateway: set repo
+# secrets SEKISHO_BASE_URL, SEKISHO_LLM_KEY, SEKISHO_EMBED_KEY. Also runnable on
+# demand.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  maintain:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: banto
+        ports:
+          - 5559:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: erlef/setup-beam@v1
+        with:
+          version-type: strict
+          version-file: .tool-versions
+
+      - name: Compile
+        run: rebar3 compile
+
+      - name: Generate runtime config
+        run: |
+          cat > config/ci.sys.config <<EOF
+          [
+            {pg_types, [{uuid_format, string}]},
+            {bunko, [{embedding_dim, 1536}]},
+            {kura, [
+              {dialect, kura_dialect_pg},
+              {repos, #{banto_repo => #{
+                pool_module => kura_pool_pgo, driver_module => kura_driver_pgo,
+                database => <<"banto">>, hostname => <<"localhost">>, port => 5559,
+                username => <<"postgres">>, password => <<"root">>, pool_size => 5}}}
+            ]},
+            {banto, [
+              {repo, banto_repo}, {namespace, <<"banto">>}, {mcp_port, 8080},
+              {model, <<"claude-sonnet-4-6">>},
+              {embedder, {banto_embedder, #{base_url => <<"${{ secrets.SEKISHO_BASE_URL }}/openai">>,
+                                            api_key => <<"${{ secrets.SEKISHO_EMBED_KEY }}">>,
+                                            model => <<"text-embedding-3-small">>}}},
+              {llm, {gakudan_llm_anthropic, #{base_url => <<"${{ secrets.SEKISHO_BASE_URL }}/anthropic">>,
+                                              api_key => <<"${{ secrets.SEKISHO_LLM_KEY }}">>}}}
+            ]}
+          ].
+          EOF
+
+      - name: Index and run maintenance
+        run: |
+          rebar3 shell --config config/ci.sys.config --eval '
+            {ok, _} = application:ensure_all_started(banto),
+            ok = banto:ensure_schema(),
+            {ok, _} = banto:index(".", #{name => <<"banto">>}),
+            {ok, Report} = banto_maintenance:run(".", #{repo => <<"banto">>}),
+            ok = file:write_file("maintenance.md", Report),
+            init:stop().'
+
+      - name: Open maintenance issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "banto maintenance: $(date -u +%Y-%m-%d)" \
+            --body-file maintenance.md \
+            --label maintenance || true

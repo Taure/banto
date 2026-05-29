@@ -60,9 +60,10 @@ use, route through a [sekisho](https://github.com/Taure/sekisho) gateway - see
 
 ## Status
 
-P1 (cross-repo indexing, recall, ask, MCP surface) and P2 (PR review swarm +
-saiten gate + CLI + GitHub Action) are done. P3 (nightly maintenance agents + a
-Nova + Datastar dashboard) is on the roadmap.
+P1 (indexing, recall, ask, MCP surface), P2 (PR review swarm + saiten gate + CLI
++ GitHub Action), and P3a (nightly maintenance: dependency + doc-drift report
+via `banto_maintenance`, a `maintain` CLI subcommand, and a scheduled Action) are
+done. P3b (a Nova + Datastar dashboard) is on the roadmap.
 
 ## License
 
