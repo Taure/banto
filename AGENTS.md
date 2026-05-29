@@ -21,8 +21,8 @@ All under https://github.com/Taure:
   All of banto's LLM + embedding traffic routes here for keys, budgets, audit.
 - **[madoguchi](https://github.com/Taure/madoguchi)** - MCP *server* framework.
   banto exposes `recall` / `ask` / `index_repo` as MCP tools through it.
-- **[saiten](https://github.com/Taure/saiten)** - eval/scoring + CI gate. From
-  P2, grades the review swarm against a planted-bug benchmark.
+- **[saiten](https://github.com/Taure/saiten)** - eval/scoring + CI gate. Grades
+  the review swarm against a planted-bug benchmark (`banto_review_eval`).
 
 ## How it fits together
 
@@ -38,9 +38,10 @@ metadata, so recall spans every repo and a `repo` filter narrows it.
 
 ## Roadmap
 
-- **P1 (now):** spine + cross-repo knowledge + the MCP surface.
-- **P2:** PR review swarm (gakudan fanout grounded by bunko recall), saiten CI
-  gate, a CLI, a GitHub Action.
+- **P1 (done):** spine + cross-repo knowledge + the MCP surface.
+- **P2 (done):** PR review swarm (gakudan fanout grounded by bunko recall),
+  saiten CI gate (`banto_review_eval`), the `banto_cli` escript, an opt-in
+  GitHub Action.
 - **P3:** nightly maintenance agents (dep/doc drift) + a Nova + Datastar
   dashboard (same stack as gakudan_liveboard, not Arizona).
 

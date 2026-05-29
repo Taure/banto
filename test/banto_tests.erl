@@ -86,6 +86,24 @@ mcp_format_hits_test() ->
 
 %% --- MCP tool specs ---
 
+%% --- banto_cli:parse ---
+
+cli_parse_index_test() ->
+    ?assertEqual({ok, {index, "/p", ~"kura"}}, banto_cli:parse(["index", "/p", "kura"])).
+
+cli_parse_recall_test() ->
+    ?assertEqual({ok, {recall, ~"q"}}, banto_cli:parse(["recall", "q"])).
+
+cli_parse_ask_test() ->
+    ?assertEqual({ok, {ask, ~"why"}}, banto_cli:parse(["ask", "why"])).
+
+cli_parse_review_test() ->
+    ?assertEqual({ok, {review, "d.diff"}}, banto_cli:parse(["review", "d.diff"])).
+
+cli_parse_usage_test() ->
+    ?assertEqual({error, usage}, banto_cli:parse(["bogus"])),
+    ?assertEqual({error, usage}, banto_cli:parse([])).
+
 tool_specs_test() ->
     ?assertEqual(~"recall", banto_mcp_recall:name()),
     ?assertEqual(~"ask", banto_mcp_ask:name()),

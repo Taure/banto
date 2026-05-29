@@ -1,0 +1,85 @@
+name: banto review
+
+# Opt-in PR review by the banto swarm. Triggered by adding the `banto-review`
+# label to a PR (or run manually). Needs a sekisho gateway: set repo secrets
+# SEKISHO_BASE_URL, SEKISHO_LLM_KEY, SEKISHO_EMBED_KEY. It does not run on every
+# PR (no cost unless you ask for it).
+
+on:
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+
+jobs:
+  review:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'banto-review'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: banto
+        ports:
+          - 5559:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: erlef/setup-beam@v1
+        with:
+          version-type: strict
+          version-file: .tool-versions
+
+      - name: Compile
+        run: rebar3 compile
+
+      - name: Compute PR diff
+        run: git diff "origin/${{ github.base_ref }}...HEAD" > pr.diff
+
+      - name: Generate runtime config
+        run: |
+          cat > config/ci.sys.config <<EOF
+          [
+            {pg_types, [{uuid_format, string}]},
+            {bunko, [{embedding_dim, 1536}]},
+            {kura, [
+              {dialect, kura_dialect_pg},
+              {repos, #{banto_repo => #{
+                pool_module => kura_pool_pgo, driver_module => kura_driver_pgo,
+                database => <<"banto">>, hostname => <<"localhost">>, port => 5559,
+                username => <<"postgres">>, password => <<"root">>, pool_size => 5}}}
+            ]},
+            {banto, [
+              {repo, banto_repo}, {namespace, <<"banto">>}, {mcp_port, 8080},
+              {model, <<"claude-sonnet-4-6">>},
+              {embedder, {banto_embedder, #{base_url => <<"${{ secrets.SEKISHO_BASE_URL }}/openai">>,
+                                            api_key => <<"${{ secrets.SEKISHO_EMBED_KEY }}">>,
+                                            model => <<"text-embedding-3-small">>}}},
+              {llm, {gakudan_llm_anthropic, #{base_url => <<"${{ secrets.SEKISHO_BASE_URL }}/anthropic">>,
+                                              api_key => <<"${{ secrets.SEKISHO_LLM_KEY }}">>}}}
+            ]}
+          ].
+          EOF
+
+      - name: Run review swarm and post
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          rebar3 shell --config config/ci.sys.config --eval '
+            {ok, _} = application:ensure_all_started(banto),
+            ok = banto:ensure_schema(),
+            {ok, Diff} = file:read_file("pr.diff"),
+            {ok, Reviews} = banto_review:review(Diff, #{}),
+            ok = file:write_file("review.md", banto_review:format(Reviews)),
+            init:stop().'
+          gh pr comment "$PR" --body-file review.md

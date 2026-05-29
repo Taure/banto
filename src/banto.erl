@@ -13,6 +13,12 @@ See `m:banto_config` for the application-environment knobs.
 """.
 
 -export([ensure_schema/0, index/2, recall/2, ask/2, ctx/0]).
+-export([main/1]).
+
+-doc false.
+-spec main([string()]) -> no_return().
+main(Args) ->
+    banto_cli:main(Args).
 
 -doc "Create the bunko schema in the configured repo. Idempotent; call at setup.".
 -spec ensure_schema() -> ok | {error, term()}.
