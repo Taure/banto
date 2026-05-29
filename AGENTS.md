@@ -46,8 +46,10 @@ metadata, so recall spans every repo and a `repo` filter narrows it.
   `banto_maintainer_docs` (gakudan doc-drift agent), combined by
   `banto_maintenance`, surfaced via the `maintain` CLI subcommand and a scheduled
   GitHub Action that opens an issue.
-- **P3b:** a Nova + Datastar dashboard (same stack as gakudan_liveboard, not
-  Arizona).
+- **P3b (done):** a Nova + Datastar memory console (`banto_router` +
+  `banto_dashboard_page`) on a second cowboy listener (:8081; MCP stays on :8080):
+  indexed-repo summary + live recall search via Datastar `@post`. Same stack as
+  gakudan_liveboard, not Arizona.
 
 ## Commands
 

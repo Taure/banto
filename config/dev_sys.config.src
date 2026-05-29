@@ -4,6 +4,14 @@
     {kernel, [
         {logger_level, info}
     ]},
+    {nova, [
+        {environment, dev},
+        {cowboy_configuration, #{port => 8081}},
+        {bootstrap_application, banto},
+        {plugins, [
+            {pre_request, nova_request_plugin, #{decode_json_body => false}}
+        ]}
+    ]},
     {pg_types, [{uuid_format, string}]},
     {bunko, [
         {embedding_dim, 1536}

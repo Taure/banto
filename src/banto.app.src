@@ -19,7 +19,9 @@
         gakudan,
         madoguchi,
         bunko,
-        saiten
+        saiten,
+        datastar,
+        nova
     ]},
     {env, []},
     {modules, []},

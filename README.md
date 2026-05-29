@@ -31,6 +31,8 @@ it.
   tests, architecture) over a diff via gakudan, each grounded by the same
   recalled context; `banto_review_eval` is a saiten benchmark that gates the
   swarm in CI.
+- `banto_router` + `banto_dashboard_page` serve a Nova + Datastar memory console
+  on `:8081`: the indexed-repo summary and a live recall search.
 
 ## Quick start
 
@@ -60,10 +62,11 @@ use, route through a [sekisho](https://github.com/Taure/sekisho) gateway - see
 
 ## Status
 
-P1 (indexing, recall, ask, MCP surface), P2 (PR review swarm + saiten gate + CLI
-+ GitHub Action), and P3a (nightly maintenance: dependency + doc-drift report
-via `banto_maintenance`, a `maintain` CLI subcommand, and a scheduled Action) are
-done. P3b (a Nova + Datastar dashboard) is on the roadmap.
+All phases are in: P1 (indexing, recall, ask, MCP surface), P2 (PR review swarm +
+saiten gate + CLI + GitHub Action), P3a (nightly maintenance: dependency +
+doc-drift report via `banto_maintenance`, a `maintain` CLI subcommand, a
+scheduled Action), and P3b (a Nova + Datastar memory console on `:8081` -
+indexed-repo summary + live recall search).
 
 ## License
 
