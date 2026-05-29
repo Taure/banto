@@ -139,6 +139,35 @@ cli_parse_usage_test() ->
     ?assertEqual({error, usage}, banto_cli:parse(["bogus"])),
     ?assertEqual({error, usage}, banto_cli:parse([])).
 
+%% --- banto_dashboard_page rendering ---
+
+dashboard_page_shell_test() ->
+    Html = iolist_to_binary(banto_dashboard_page:page(~"banto", ~"<p>x</p>")),
+    ?assertNotEqual(nomatch, binary:match(Html, ~"<!DOCTYPE html")),
+    ?assertNotEqual(nomatch, binary:match(Html, ~"/assets/js/datastar.js")),
+    ?assertNotEqual(nomatch, binary:match(Html, ~"<p>x</p>")).
+
+dashboard_repo_summary_html_test() ->
+    Out = iolist_to_binary(
+        banto_dashboard_page:repo_summary_html([#{repo => ~"kura", count => 3}])
+    ),
+    ?assertNotEqual(nomatch, binary:match(Out, ~"kura")),
+    ?assertNotEqual(nomatch, binary:match(Out, ~">3<")),
+    Empty = iolist_to_binary(banto_dashboard_page:repo_summary_html([])),
+    ?assertNotEqual(nomatch, binary:match(Empty, ~"nothing indexed")).
+
+dashboard_results_html_test() ->
+    Hit = #{content => ~"some code", metadata => #{~"repo" => ~"kura", ~"path" => ~"x.erl"}},
+    Out = iolist_to_binary(banto_dashboard_page:results_html([Hit])),
+    ?assertNotEqual(nomatch, binary:match(Out, ~"kura/x.erl")),
+    ?assertNotEqual(nomatch, binary:match(Out, ~"some code")),
+    ?assertNotEqual(nomatch, binary:match(banto_dashboard_page:results_html([]), ~"no matches")).
+
+dashboard_query_signal_test() ->
+    ?assertEqual(~"find this", banto_dashboard_page:query_signal(~"{\"query\":\"find this\"}")),
+    ?assertEqual(~"", banto_dashboard_page:query_signal(~"{}")),
+    ?assertEqual(~"", banto_dashboard_page:query_signal(~"not json")).
+
 tool_specs_test() ->
     ?assertEqual(~"recall", banto_mcp_recall:name()),
     ?assertEqual(~"ask", banto_mcp_ask:name()),
