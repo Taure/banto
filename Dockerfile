@@ -1,4 +1,4 @@
-# Build the prod release. Clever Cloud builds this Dockerfile from source.
+# Build the prod release as a self-contained OCI image (deploy anywhere).
 FROM erlang:29 AS build
 WORKDIR /src
 # Deps first for layer caching.
@@ -22,7 +22,7 @@ WORKDIR /app
 COPY --from=build /src/_build/prod/rel/banto ./
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
-# Default role; override per Clever app (BANTO_ROLE=mcp for the MCP app).
+# Default role; override per deployment (BANTO_ROLE=mcp for the MCP app).
 ENV BANTO_ROLE=dashboard
 EXPOSE 8080
 ENTRYPOINT ["/app/entrypoint.sh"]

@@ -1,9 +1,10 @@
 #!/bin/sh
 set -e
 
-# Clever Cloud routes external traffic to the single port $PORT (default 8080).
+# The platform routes external traffic to a single port $PORT (default 8080).
 # BANTO_ROLE picks which listener binds it; the other binds an unreachable
-# internal port. Both Clever apps run this same image, sharing the DB + sekisho.
+# internal port. Both roles run this same image, sharing the DB + sekisho.
+export RELX_REPLACE_OS_VARS=true
 : "${PORT:=8080}"
 : "${BANTO_ROLE:=dashboard}"
 : "${EMBEDDING_DIM:=1536}"

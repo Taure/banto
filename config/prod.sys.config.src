@@ -1,9 +1,9 @@
 %% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %%
 %% Production config, env-var driven (relx substitutes ${VAR} in this .src at
-%% boot). The PostgreSQL values are injected by Clever Cloud's PostgreSQL add-on.
-%% NOVA_PORT / MCP_PORT are set by entrypoint.sh from BANTO_ROLE + $PORT, so the
-%% public listener (whichever the role selects) binds Clever's routed port.
+%% boot). Provide the database via BANTO_DB_*. NOVA_PORT / MCP_PORT are set by
+%% entrypoint.sh from BANTO_ROLE + $PORT, so the public listener (whichever the
+%% role selects) binds the platform's routed port.
 
 [
     {kernel, [{logger_level, info}]},
@@ -15,11 +15,11 @@
             banto_repo => #{
                 pool_module => kura_pool_pgo,
                 driver_module => kura_driver_pgo,
-                hostname => ~"${POSTGRESQL_ADDON_HOST}",
-                port => ${POSTGRESQL_ADDON_PORT},
-                database => ~"${POSTGRESQL_ADDON_DB}",
-                username => ~"${POSTGRESQL_ADDON_USER}",
-                password => ~"${POSTGRESQL_ADDON_PASSWORD}",
+                hostname => ~"${BANTO_DB_HOST}",
+                port => ${BANTO_DB_PORT},
+                database => ~"${BANTO_DB}",
+                username => ~"${BANTO_DB_USER}",
+                password => ~"${BANTO_DB_PASSWORD}",
                 pool_size => 10
             }
         }}
