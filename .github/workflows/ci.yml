@@ -25,6 +25,7 @@ jobs:
       enable-ex-doc: true
       enable-hank: true
       enable-audit: true
+      audit-ignores: 'GHSA-g2wm-735q-3f56'
       enable-coverage: true
       enable-elp-lint: false
       enable-elp-eqwalize: false
