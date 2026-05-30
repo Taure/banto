@@ -11,6 +11,7 @@ panel's `/dashboard/index/stream` to `m:banto_index_stream`.
 -spec handle(tuple(), term(), cowboy_req:req()) -> no_return().
 handle({stream, _Code, _Headers, _Spec} = Stream, Callback, Req) ->
     case cowboy_req:path(Req) of
-        ~"/dashboard/flow/stream" -> banto_flow_stream:handle(Stream, Callback, Req);
+        ~"/dashboard/flow/ask" -> banto_flow_stream:handle(Stream, Callback, Req);
+        ~"/dashboard/flow/recall" -> banto_flow_stream:handle(Stream, Callback, Req);
         _ -> banto_index_stream:handle(Stream, Callback, Req)
     end.

@@ -1,8 +1,9 @@
 -module(banto_flow_stream).
 -moduledoc """
 Nova `stream` handler for the dashboard's live ask/recall flow. Reads the
-`question` and `mode` (`ask` | `recall`) signals from the held GET's `datastar`
-query param, runs the instrumented `banto:ask/3` or `banto:recall/3` in a
+`question` from the Datastar `@post` body (the `mode` is the request path:
+`/dashboard/flow/ask` vs `/recall`), runs the instrumented `banto:ask/3` or
+`banto:recall/3` in a
 monitored worker, patches `#flow` live as each step arrives, patches `#answer`
 with the result, then closes (`fin`). The flow is private to this request - no
 hub. A client disconnect kills the worker, so an in-flight LLM call is not leaked.
@@ -16,8 +17,10 @@ See ADR 0007.
 
 -spec handle(tuple(), term(), cowboy_req:req()) -> no_return().
 handle({stream, Code, Headers, _Spec}, _Callback, Req0) ->
-    {Mode, Question} = banto_dashboard_page:flow_params(Req0),
-    Req = cowboy_req:stream_reply(Code, Headers, Req0),
+    {ok, Body, Req1} = cowboy_req:read_body(Req0),
+    Mode = banto_dashboard_page:flow_mode(cowboy_req:path(Req1)),
+    Question = banto_dashboard_page:flow_question(Body),
+    Req = cowboy_req:stream_reply(Code, Headers, Req1),
     run(Req, Mode, Question),
     _ = send(Req, ~"", fin),
     exit(normal).

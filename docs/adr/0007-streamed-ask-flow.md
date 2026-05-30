@@ -43,10 +43,12 @@ it is *per-request, private to the asker, and finite*.
   frames and keepalives. On client disconnect a frame send fails and the handler
   `exit(Worker, kill)`s it - a linked `exit(normal)` would NOT stop the worker,
   leaking the in-flight LLM call.
-- **The question/mode ride the datastar query param.** Datastar `@get` serialises
-  the signal store as one `datastar=<json>` param; the handler decodes it with
-  `datastar:read_signals/1` (it does NOT support arbitrary `?q=` keys). `mode`
-  (`ask` | `recall`) selects synthesis vs retrieval-only.
+- **Submitted via `@post`, the proven search-box idiom.** The question rides the
+  Datastar `@post` body (decoded with `datastar:read_signals/1`, exactly like
+  `search/1`); `mode` is the request path (`/dashboard/flow/ask` vs `/recall`).
+  An earlier `@get` design with an inline `$mode='..'; @get(..)` signal-assignment
+  expression did not fire in the browser - `@post` + a per-mode path avoids both
+  the expression and any reliance on `@get` query serialisation.
 - **One registered Nova `stream` handler, dispatched on path** (`banto_stream`):
   `/dashboard/flow/stream` -> `banto_flow_stream`, else -> `banto_index_stream`.
 

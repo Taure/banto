@@ -12,7 +12,7 @@ single Datastar patch of `#results` (one-shot SSE, no held connection).
 
 -export([index/1, search/1, start_index/1, index_stream/1, flow_stream/1]).
 -export([page/2, repo_summary_html/1, results_html/1, query_signal/1, jobs_html/1]).
--export([flow_params/1, flow_html/1, answer_html/1]).
+-export([flow_question/1, flow_mode/1, flow_html/1, answer_html/1]).
 
 %% GET /
 index(_Req) ->
@@ -55,22 +55,18 @@ index_stream(_Req) ->
 flow_stream(_Req) ->
     {stream, 200, maps:from_list(datastar:sse_headers()), #{}}.
 
--doc "Read the `question` and `mode` signals from a held GET's datastar param.".
--spec flow_params(cowboy_req:req()) -> {ask | recall, binary()}.
-flow_params(Req) ->
-    #{datastar := Json} = cowboy_req:match_qs([{datastar, [], ~"{}"}], Req),
-    case datastar:read_signals(Json) of
-        {ok, Signals} ->
-            Question = string:trim(maps:get(~"question", Signals, ~"")),
-            Mode =
-                case maps:get(~"mode", Signals, ~"ask") of
-                    ~"recall" -> recall;
-                    _ -> ask
-                end,
-            {Mode, Question};
-        _ ->
-            {ask, ~""}
+-doc "The `question` signal from a Datastar `@post` body (same idiom as search/1).".
+-spec flow_question(binary()) -> binary().
+flow_question(Body) ->
+    case datastar:read_signals(Body) of
+        {ok, #{~"question" := Q}} when is_binary(Q) -> string:trim(Q);
+        _ -> ~""
     end.
+
+-doc "Map the flow stream's request path to its mode.".
+-spec flow_mode(binary()) -> ask | recall.
+flow_mode(~"/dashboard/flow/recall") -> recall;
+flow_mode(_Path) -> ask.
 
 %% --- rendering ---
 
@@ -87,10 +83,10 @@ body(Summary) ->
         ~"<div id=\"index-status\" class=\"empty\"></div>",
         ~"<div id=\"jobs\" class=\"jobs\"><p class=\"empty\">no index jobs yet.</p></div></div>",
         ~"<h2>ask &amp; recall</h2>",
-        ~"<div data-signals-question=\"''\" data-signals-mode=\"'ask'\"><div class=\"search\">",
+        ~"<div data-signals-question=\"''\"><div class=\"search\">",
         ~"<input type=\"text\" placeholder=\"ask across your repos...\" data-bind-question>",
-        ~"<button data-on-click=\"$mode='recall'; @get('/dashboard/flow/stream')\">recall</button>",
-        ~"<button data-on-click=\"$mode='ask'; @get('/dashboard/flow/stream')\">ask</button></div>",
+        ~"<button data-on-click=\"@post('/dashboard/flow/recall')\">recall</button>",
+        ~"<button data-on-click=\"@post('/dashboard/flow/ask')\">ask</button></div>",
         ~"<div id=\"flow\" class=\"flow\"><p class=\"empty\">the agent's flow will appear here.</p></div>",
         ~"<div id=\"answer\" class=\"results\"><p class=\"empty\">the answer will appear here.</p></div></div>"
     ].
