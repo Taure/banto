@@ -15,10 +15,10 @@
             banto_repo => #{
                 pool_module => kura_pool_pgo,
                 driver_module => kura_driver_pgo,
-                hostname => ~"${BANTO_DB_HOST}",
+                host => ~"${BANTO_DB_HOST}",
                 port => ${BANTO_DB_PORT},
                 database => ~"${BANTO_DB}",
-                username => ~"${BANTO_DB_USER}",
+                user => ~"${BANTO_DB_USER}",
                 password => ~"${BANTO_DB_PASSWORD}",
                 pool_size => 10
             }

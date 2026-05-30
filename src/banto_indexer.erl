@@ -16,10 +16,11 @@ deletes its previous memories, so the operation is idempotent per repo.
 -doc "Index `RepoPath` under repo short-name `Name`. Returns `{files, chunks}` counts.".
 -spec index(bunko:context(), file:filename_all(), binary()) -> {ok, map()} | {error, term()}.
 index(Ctx, RepoPath, Name) ->
+    Root = to_path_list(RepoPath),
     case delete_existing(Ctx, Name) of
         ok ->
-            Files = collect_files(RepoPath),
-            {Stored, Chunks} = store_files(Ctx, RepoPath, Name, Files, 0, 0),
+            Files = collect_files(Root),
+            {Stored, Chunks} = store_files(Ctx, Root, Name, Files, 0, 0),
             {ok, #{files => Stored, chunks => Chunks}};
         {error, _} = Err ->
             Err
@@ -30,7 +31,13 @@ index(Ctx, RepoPath, Name) ->
 -doc "Recursively collect indexable file paths under `Root`.".
 -spec collect_files(file:filename_all()) -> [file:filename_all()].
 collect_files(Root) ->
-    lists:reverse(walk(Root, [])).
+    lists:reverse(walk(to_path_list(Root), [])).
+
+%% Normalise a filename_all() to a charlist so the walk and metadata paths
+%% (which compare and concatenate with strings) work for binary inputs too -
+%% MCP/JSON paths arrive as binaries.
+to_path_list(P) when is_binary(P) -> unicode:characters_to_list(P);
+to_path_list(P) -> P.
 
 walk(Path, Acc) ->
     case filelib:is_dir(Path) of
