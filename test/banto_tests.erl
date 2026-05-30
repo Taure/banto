@@ -175,3 +175,20 @@ tool_specs_test() ->
     ?assertEqual([~"query"], maps:get(~"required", banto_mcp_recall:input_schema())),
     ?assertEqual([~"question"], maps:get(~"required", banto_mcp_ask:input_schema())),
     ?assertEqual([~"path", ~"name"], maps:get(~"required", banto_mcp_index:input_schema())).
+
+%% --- banto_indexer:collect_files accepts binary paths (MCP/JSON inputs) ---
+
+collect_files_binary_path_test() ->
+    Dir = filename:join("/tmp", "banto_idx_" ++ integer_to_list(erlang:unique_integer([positive]))),
+    ok = filelib:ensure_path(Dir),
+    File = filename:join(Dir, "readme.md"),
+    ok = file:write_file(File, ~"# hello\nworld"),
+    try
+        FromList = banto_indexer:collect_files(Dir),
+        FromBinary = banto_indexer:collect_files(unicode:characters_to_binary(Dir)),
+        ?assertEqual(FromList, FromBinary),
+        ?assertEqual(1, length(FromList))
+    after
+        _ = file:delete(File),
+        _ = file:del_dir(Dir)
+    end.
