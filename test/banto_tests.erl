@@ -224,3 +224,33 @@ jobs_html_test() ->
     ?assertNotEqual(nomatch, binary:match(H, ~"kura")),
     ?assertNotEqual(nomatch, binary:match(H, ~"3/6")),
     ?assertNotEqual(nomatch, binary:match(H, ~"50%")).
+
+%% --- banto_chunk_markdown (ADR 0006) ---
+
+symbols(Chunks) ->
+    [maps:get(~"symbol", M, undefined) || {_T, M} <- Chunks].
+
+chunk_markdown_sections_test() ->
+    Chunks = banto_chunk_markdown:chunk(~"intro\n## First\na\nb\n## Second\nc"),
+    Syms = symbols(Chunks),
+    ?assert(lists:member(~"First", Syms)),
+    ?assert(lists:member(~"Second", Syms)),
+    %% preamble before the first heading is untagged
+    ?assert(lists:member(undefined, Syms)).
+
+chunk_markdown_fence_not_heading_test() ->
+    %% a '#' line inside a code fence must not start a section
+    Chunks = banto_chunk_markdown:chunk(~"## Real\ntext\n```\n# not a heading\n```\nmore"),
+    ?assertEqual([~"Real"], [S || S <- symbols(Chunks), S =/= undefined]).
+
+%% --- banto_chunk dispatch ---
+
+chunk_dispatch_non_md_matches_line_slicer_test() ->
+    Content = iolist_to_binary(lists:join(~"\n", [integer_to_binary(N) || N <- lists:seq(1, 5)])),
+    Tuples = banto_chunk:chunk("foo.erl", Content),
+    ?assertEqual(banto_indexer:chunk(Content), [T || {T, _M} <- Tuples]),
+    ?assert(lists:all(fun({_T, M}) -> M =:= #{} end, Tuples)).
+
+chunk_dispatch_md_uses_markdown_test() ->
+    Tuples = banto_chunk:chunk("readme.md", ~"## H\nbody"),
+    ?assertEqual([~"H"], [S || S <- symbols(Tuples), S =/= undefined]).
