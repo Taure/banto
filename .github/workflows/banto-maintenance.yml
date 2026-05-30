@@ -49,8 +49,8 @@ jobs:
               {dialect, kura_dialect_pg},
               {repos, #{banto_repo => #{
                 pool_module => kura_pool_pgo, driver_module => kura_driver_pgo,
-                database => <<"banto">>, hostname => <<"localhost">>, port => 5559,
-                username => <<"postgres">>, password => <<"root">>, pool_size => 5}}}
+                database => <<"banto">>, host => <<"localhost">>, port => 5559,
+                user => <<"postgres">>, password => <<"root">>, pool_size => 5}}}
             ]},
             {banto, [
               {repo, banto_repo}, {namespace, <<"banto">>}, {mcp_port, 8080},

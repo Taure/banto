@@ -32,9 +32,9 @@ start() ->
         pool_module => kura_pool_pgo,
         driver_module => kura_driver_pgo,
         database => env(~"BANTO_TEST_DB", ~"banto_test"),
-        hostname => env(~"BANTO_TEST_DB_HOST", ~"localhost"),
+        host => env(~"BANTO_TEST_DB_HOST", ~"localhost"),
         port => env_int(~"BANTO_TEST_DB_PORT", 5559),
-        username => env(~"BANTO_TEST_DB_USER", ~"postgres"),
+        user => env(~"BANTO_TEST_DB_USER", ~"postgres"),
         password => env(~"BANTO_TEST_DB_PASSWORD", ~"root"),
         pool_size => 5
     }),
