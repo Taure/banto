@@ -67,3 +67,26 @@ answer_html_error_test() ->
     H = iolist_to_binary(banto_dashboard_page:answer_html({error, timeout})),
     ?assertNotEqual(nomatch, binary:match(H, ~"error:")),
     ?assertNotEqual(nomatch, binary:match(H, ~"timeout")).
+
+%% --- banto_flow_hub: report/subscribe/snapshot + new-flow reset ---
+
+flow_hub_test() ->
+    {ok, Pid} = banto_flow_hub:start_link(),
+    try
+        ?assertEqual({[], undefined}, banto_flow_hub:subscribe()),
+        banto_flow_hub:report(#{step => recall, phase => start, question_len => 5}),
+        ?assertMatch({[_], undefined}, recv()),
+        banto_flow_hub:report(#{step => answer, phase => done, answer => ~"hi"}),
+        ?assertMatch({[_, _], {ok, ~"hi"}}, recv()),
+        %% a fresh recall/start resets the flow
+        banto_flow_hub:report(#{step => recall, phase => start, question_len => 3}),
+        ?assertMatch({[_], undefined}, recv())
+    after
+        gen_server:stop(Pid)
+    end.
+
+recv() ->
+    receive
+        {banto_flow_update, Steps, Answer} -> {Steps, Answer}
+    after 1000 -> error(timeout)
+    end.

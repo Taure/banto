@@ -15,11 +15,8 @@ routes(_Environment) ->
                 {"/dashboard/index/stream", fun banto_dashboard_page:index_stream/1, #{
                     methods => [get]
                 }},
-                {"/dashboard/flow/ask", fun banto_dashboard_page:flow_stream/1, #{
-                    methods => [post]
-                }},
-                {"/dashboard/flow/recall", fun banto_dashboard_page:flow_stream/1, #{
-                    methods => [post]
+                {"/dashboard/flow/stream", fun banto_dashboard_page:flow_stream/1, #{
+                    methods => [get]
                 }},
                 {"/heartbeat", fun(_) -> {status, 200} end, #{methods => [get]}},
                 {"/assets/css/app.css", fun banto_dashboard_assets:serve/1, #{methods => [get]}},

@@ -50,18 +50,16 @@ optional `repo => binary()` filter (post-filters hits by `repo` metadata).
 """.
 -spec recall(binary(), map()) -> {ok, [bunko_store:hit()]} | {error, term()}.
 recall(Query, Opts) ->
-    case bunko:recall(ctx(), Query, Opts) of
-        {ok, Hits} -> {ok, filter_repo(Hits, maps:get(repo, Opts, undefined))};
-        {error, _} = Err -> Err
-    end.
+    recall(Query, Opts, fun banto_flow_hub:report/1).
 
 -doc """
 Answer `Question` grounded in recalled memories: recall the top-k, feed them as
 context, and synthesise an answer via the configured LLM. `Opts` as `recall/2`.
+Flow steps are reported to `m:banto_flow_hub` so the dashboard streams them live.
 """.
 -spec ask(binary(), map()) -> {ok, binary()} | {error, term()}.
 ask(Question, Opts) ->
-    banto_knowledge:ask(ctx(), Question, Opts).
+    ask(Question, Opts, fun banto_flow_hub:report/1).
 
 -doc "As `recall/2`, invoking `Flow` with a `t:banto_knowledge:step/0` per stage.".
 -spec recall(binary(), map(), fun((banto_knowledge:step()) -> ok)) ->
@@ -74,8 +72,3 @@ recall(Query, Opts, Flow) ->
     {ok, binary()} | {error, term()}.
 ask(Question, Opts, Flow) ->
     banto_knowledge:ask(ctx(), Question, Opts, Flow).
-
-filter_repo(Hits, undefined) ->
-    Hits;
-filter_repo(Hits, Repo) ->
-    [H || H <- Hits, maps:get(~"repo", maps:get(metadata, H, #{}), undefined) =:= Repo].

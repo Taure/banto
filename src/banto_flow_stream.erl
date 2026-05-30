@@ -1,83 +1,51 @@
 -module(banto_flow_stream).
 -moduledoc """
-Nova `stream` handler for the dashboard's live ask/recall flow. Reads the
-`question` from the Datastar `@post` body (the `mode` is the request path:
-`/dashboard/flow/ask` vs `/recall`), runs the instrumented `banto:ask/3` or
-`banto:recall/3` in a
-monitored worker, patches `#flow` live as each step arrives, patches `#answer`
-with the result, then closes (`fin`). The flow is private to this request - no
-hub. A client disconnect kills the worker, so an in-flight LLM call is not leaked.
-See ADR 0007.
+Nova `stream` handler for the dashboard's live ask/recall flow, modelled on
+`gakudan_liveboard_sse`: it `stream_reply`s, subscribes to `m:banto_flow_hub`,
+pushes `datastar:patch_elements` frames for `#flow` and `#answer` as steps
+arrive, and **holds the connection** (never returns, so Nova's buffered reply
+never fires). Opened from the dashboard with `data-init` on page load. The flow
+itself is produced wherever `banto:ask/2`/`recall/2` runs (console, MCP), not
+here. See ADR 0007.
 """.
 
 -export([handle/3]).
 -hank([{unnecessary_function_arguments, [{handle, 3, 2}]}]).
 
--define(KEEPALIVE_MS, 25000).
-
 -spec handle(tuple(), term(), cowboy_req:req()) -> no_return().
 handle({stream, Code, Headers, _Spec}, _Callback, Req0) ->
-    {ok, Body, Req1} = cowboy_req:read_body(Req0),
-    Mode = banto_dashboard_page:flow_mode(cowboy_req:path(Req1)),
-    Question = banto_dashboard_page:flow_question(Body),
-    Req = cowboy_req:stream_reply(Code, Headers, Req1),
-    run(Req, Mode, Question),
-    _ = send(Req, ~"", fin),
-    exit(normal).
+    Req = cowboy_req:stream_reply(Code, Headers, Req0),
+    {Steps, Answer} = banto_flow_hub:subscribe(),
+    send(Req, flow_frame(Steps)),
+    send(Req, answer_frame(Answer)),
+    loop(Req).
 
-run(Req, _Mode, ~"") ->
-    _ = send(Req, flow_frame([]));
-run(Req, Mode, Question) ->
-    Self = self(),
-    Flow = fun(Step) -> Self ! {flow_step, Step} end,
-    {Pid, Ref} = spawn_monitor(fun() -> Self ! {flow_result, Mode, op(Mode, Question, Flow)} end),
-    collect(Req, Pid, Ref, []).
-
-op(recall, Question, Flow) -> banto:recall(Question, #{limit => 8}, Flow);
-op(_Ask, Question, Flow) -> banto:ask(Question, #{limit => 8}, Flow).
-
-collect(Req, Pid, Ref, Steps) ->
+loop(Req) ->
     receive
-        {flow_step, Step} ->
-            Steps1 = Steps ++ [Step],
-            guard(Req, Pid, flow_frame(Steps1), fun() -> collect(Req, Pid, Ref, Steps1) end);
-        {flow_result, Mode, Result} ->
-            guard(Req, Pid, answer_frame(Mode, Result), fun() -> collect(Req, Pid, Ref, Steps) end);
-        {'DOWN', Ref, process, Pid, _Reason} ->
-            ok
-    after ?KEEPALIVE_MS ->
-        guard(Req, Pid, ~": keepalive\n\n", fun() -> collect(Req, Pid, Ref, Steps) end)
+        {banto_flow_update, Steps, Answer} ->
+            send(Req, flow_frame(Steps)),
+            send(Req, answer_frame(Answer)),
+            loop(Req)
     end.
 
-%% Send a frame; on a dead client, kill the worker (do not leak the LLM call).
-guard(Req, Pid, Data, Continue) ->
-    case send(Req, Data) of
-        ok -> Continue();
-        closed -> exit(Pid, kill)
-    end.
-
-send(Req, Data) ->
-    send(Req, Data, nofin).
-
-send(Req, Data, Fin) ->
-    try
-        cowboy_req:stream_body(Data, Fin, Req),
-        ok
-    catch
-        _:_ -> closed
-    end.
+send(Req, Frame) ->
+    ok = cowboy_req:stream_body(Frame, nofin, Req).
 
 flow_frame(Steps) ->
     datastar:patch_elements(
         banto_dashboard_page:flow_html(Steps), #{selector => ~"#flow", mode => inner}
     ).
 
-answer_frame(recall, {ok, Hits}) ->
-    answer_patch(banto_dashboard_page:answer_html({hits, Hits}));
-answer_frame(_Ask, {ok, Answer}) ->
-    answer_patch(banto_dashboard_page:answer_html({ok, Answer}));
-answer_frame(_Mode, {error, Reason}) ->
-    answer_patch(banto_dashboard_page:answer_html({error, Reason})).
-
-answer_patch(Html) ->
-    datastar:patch_elements(Html, #{selector => ~"#answer", mode => inner}).
+answer_frame(undefined) ->
+    datastar:patch_elements(
+        ~"<p class=\"empty\">the answer will appear here.</p>",
+        #{selector => ~"#answer", mode => inner}
+    );
+answer_frame({ok, Answer}) ->
+    datastar:patch_elements(
+        banto_dashboard_page:answer_html({ok, Answer}), #{selector => ~"#answer", mode => inner}
+    );
+answer_frame({error, Reason}) ->
+    datastar:patch_elements(
+        banto_dashboard_page:answer_html({error, Reason}), #{selector => ~"#answer", mode => inner}
+    ).

@@ -12,7 +12,7 @@ single Datastar patch of `#results` (one-shot SSE, no held connection).
 
 -export([index/1, search/1, start_index/1, index_stream/1, flow_stream/1]).
 -export([page/2, repo_summary_html/1, results_html/1, query_signal/1, jobs_html/1]).
--export([flow_question/1, flow_mode/1, flow_html/1, answer_html/1]).
+-export([flow_html/1, answer_html/1]).
 
 %% GET /
 index(_Req) ->
@@ -51,22 +51,9 @@ start_index(Req) ->
 index_stream(_Req) ->
     {stream, 200, maps:from_list(datastar:sse_headers()), #{}}.
 
-%% GET /dashboard/flow/stream - held SSE; banto_flow_stream runs the ask/recall.
+%% GET /dashboard/flow/stream - held SSE; banto_flow_stream observes the hub.
 flow_stream(_Req) ->
     {stream, 200, maps:from_list(datastar:sse_headers()), #{}}.
-
--doc "The `question` signal from a Datastar `@post` body (same idiom as search/1).".
--spec flow_question(binary()) -> binary().
-flow_question(Body) ->
-    case datastar:read_signals(Body) of
-        {ok, #{~"question" := Q}} when is_binary(Q) -> string:trim(Q);
-        _ -> ~""
-    end.
-
--doc "Map the flow stream's request path to its mode.".
--spec flow_mode(binary()) -> ask | recall.
-flow_mode(~"/dashboard/flow/recall") -> recall;
-flow_mode(_Path) -> ask.
 
 %% --- rendering ---
 
@@ -74,20 +61,14 @@ body(Summary) ->
     [
         ~"<h2>indexed repositories</h2>",
         repo_summary_html(Summary),
-        ~"<h2>index a repo</h2>",
-        ~"<div data-signals-path=\"''\" data-signals-name=\"''\" data-on-load=\"@get('/dashboard/index/stream')\">",
-        ~"<div class=\"search\">",
-        ~"<input type=\"text\" placeholder=\"/repos/personal/gakudan\" data-bind-path>",
-        ~"<input type=\"text\" placeholder=\"name\" data-bind-name>",
-        ~"<button data-on-click=\"@post('/dashboard/index')\">index</button></div>",
-        ~"<div id=\"index-status\" class=\"empty\"></div>",
+        ~"<h2>index jobs</h2>",
+        ~"<p class=\"empty\">index via scripts/index-github.sh or the index_repo MCP tool; progress streams here.</p>",
+        ~"<div data-init=\"@get('/dashboard/index/stream')\">",
         ~"<div id=\"jobs\" class=\"jobs\"><p class=\"empty\">no index jobs yet.</p></div></div>",
-        ~"<h2>ask &amp; recall</h2>",
-        ~"<div data-signals-question=\"''\"><div class=\"search\">",
-        ~"<input type=\"text\" placeholder=\"ask across your repos...\" data-bind-question>",
-        ~"<button data-on-click=\"@post('/dashboard/flow/recall')\">recall</button>",
-        ~"<button data-on-click=\"@post('/dashboard/flow/ask')\">ask</button></div>",
-        ~"<div id=\"flow\" class=\"flow\"><p class=\"empty\">the agent's flow will appear here.</p></div>",
+        ~"<h2>ask &amp; recall flow</h2>",
+        ~"<p class=\"empty\">run an ask or recall from a console or the MCP tools; the flow streams here live.</p>",
+        ~"<div data-init=\"@get('/dashboard/flow/stream')\">",
+        ~"<div id=\"flow\" class=\"flow\"><p class=\"empty\">no flow yet.</p></div>",
         ~"<div id=\"answer\" class=\"results\"><p class=\"empty\">the answer will appear here.</p></div></div>"
     ].
 
@@ -303,6 +284,7 @@ snippet(_) ->
 html(Body) ->
     Headers = #{
         ~"content-type" => ~"text/html; charset=utf-8",
+        ~"cache-control" => ~"no-store",
         ~"content-security-policy" =>
             ~"default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'"
     },

@@ -1,63 +1,57 @@
-# 7. Streamed ask/recall flow
+# 7. Streamed ask/recall flow (observe a hub, like the liveboard)
 
 Date: 2026-05-30
 
 ## Status
 
 Accepted. Builds on [ADR 0004](0004-dashboard.md) and
-[ADR 0005](0005-streamed-background-indexing.md).
+[ADR 0005](0005-streamed-background-indexing.md). Supersedes this ADR's own
+first cut (a per-request, click-triggered, finite SSE), which did not work in the
+browser - see Consequences.
 
 ## Context
 
-The dashboard returned only end results: recall as a one-shot hit list, ask as a
-single answer after a multi-second blocking LLM call, with nothing in between.
-The retrieval that grounds an answer - which chunks were recalled, from which
-repo/path, then the prompt build and the LLM call - was invisible. For a RAG
-concierge that opacity is the opposite of trust, and `/workflows` (which can show
-agent progress) is unavailable while a session is busy.
+The dashboard showed only end results; the retrieval that grounds an answer
+(which chunks, from where, then the prompt and the LLM call) was invisible. We
+want to watch a flow happen live.
 
-ADR 0005 established the held-SSE + Datastar-patch pattern for a *shared,
-long-lived* background process (indexing, via a hub). An ask/recall is different:
-it is *per-request, private to the asker, and finite*.
+The first design ran the ask *inline* in a held SSE opened by a button
+(`data-on-click="@post(...)"`). It worked under `curl` but never in the browser:
+**Datastar v1 has no `data-on-load`** (banto used it, so the index SSE never
+opened), and - separately - the dashboard's HTML was served with **no
+`Cache-Control`**, so the browser kept a stale page and no fix ever reached it.
+gakudan_liveboard, the working reference, does none of this: it **observes** a
+shared hub over an SSE opened on load with **`data-init`**.
 
 ## Decision
 
-- **Instrument with a callback, not a new return shape.** `banto_knowledge:ask/4`
-  and `recall/4` take a `fun((step()) -> ok)` invoked at each stage (recall,
-  prompt, llm, answer, error). `ask/3` / `recall` keep their behaviour with a
-  no-op callback, so `banto:ask/2`, `recall/2` and the MCP tools are unchanged -
-  the same precedent as `banto_indexer:index/3 -> index/4`.
-- **No re-decomposition of `bunko:recall`.** The flow calls `bunko:recall`
-  whole (preserving its `limit` validation and semantics) and emits one `recall`
-  step with the hit sources, rather than re-implementing embed+search. Coarser,
-  but correct and dependency-faithful.
-- **No hub.** The flow is private to one requester and produced inside the held
-  request process; there is no shared state to fan out. One flow per connection,
-  so no cross-viewer leakage - achieved precisely *because* there is no hub.
-- **Held but finite SSE.** `GET /dashboard/flow/stream` returns `{stream,...}`;
-  the handler patches `#flow` live per step, patches `#answer` with the result,
-  then closes the body with `fin` and exits. Unlike the index stream (infinite),
-  this connection ends when the answer lands.
-- **A monitored worker, killed on disconnect.** The ask/recall runs in a
-  `spawn_monitor` worker that messages steps back; the request process patches
-  frames and keepalives. On client disconnect a frame send fails and the handler
-  `exit(Worker, kill)`s it - a linked `exit(normal)` would NOT stop the worker,
-  leaking the in-flight LLM call.
-- **Submitted via `@post`, the proven search-box idiom.** The question rides the
-  Datastar `@post` body (decoded with `datastar:read_signals/1`, exactly like
-  `search/1`); `mode` is the request path (`/dashboard/flow/ask` vs `/recall`).
-  An earlier `@get` design with an inline `$mode='..'; @get(..)` signal-assignment
-  expression did not fire in the browser - `@post` + a per-mode path avoids both
-  the expression and any reliance on `@get` query serialisation.
-- **One registered Nova `stream` handler, dispatched on path** (`banto_stream`):
-  `/dashboard/flow/stream` -> `banto_flow_stream`, else -> `banto_index_stream`.
+Adopt the gakudan_liveboard model.
+
+- **A flow hub.** `banto_flow_hub` (one gen_server) holds the most recent flow's
+  steps + answer and pub/subs to subscribers; a `recall`/`start` step begins a
+  fresh flow. Subscribers are monitored and dropped on disconnect.
+- **`ask`/`recall` report to the hub by default.** `banto:ask/2` and `recall/2`
+  pass `fun banto_flow_hub:report/1` as the flow callback (the `index/3 ->
+  index/4` precedent), so a call from **anywhere on the node** - a console, the
+  MCP tools, the CLI - streams its flow. `report/1` is a no-op when the hub is
+  not running.
+- **The dashboard observes; it does not trigger.** `banto_flow_stream` is a
+  registered Nova `stream` handler that `stream_reply`s, `subscribe`s to the hub,
+  patches `#flow` and `#answer`, and **holds the connection (never returns)** -
+  exactly `gakudan_liveboard_sse`. Opened on page load with
+  `data-init="@get('/dashboard/flow/stream')"` (GET, no body, no click). The
+  index panel uses the same `data-init` mechanism for its `#jobs` SSE; both
+  panels are observe-only (trigger work from a console / MCP).
+- **`Cache-Control: no-store`** on the dashboard HTML and assets, so a fresh
+  build always loads.
 
 ## Consequences
 
-- The user watches recall (with cited repo/path per chunk) and synthesis happen,
-  then the answer (ask) or hit list (recall) lands - both surfaces show their flow.
-- `ask/3`, `recall/2` and the MCP surface are behaviourally untouched.
-- The flow is ephemeral and single-client: no persistence, no replay.
-- This is banto's first *finite* held SSE; the `fin` + `exit(normal)` is the
-  termination contract. Requires the dashboard-role node to have the LLM/embedder
-  config (it shares the same `banto` app env).
+- Run `banto:ask`/`recall` (console or MCP) on the dashboard node and the flow
+  streams into the page live, no refresh, no button.
+- No reliance on Datastar `data-on-click`/`data-bind`, which did not bind in the
+  target browser; `data-init` + SSE is the proven path.
+- `banto:ask/3`, `recall/3` and the MCP surface are behaviourally unchanged (they
+  just also emit flow steps).
+- Node-scoped: the hub is per-node, so the dashboard shows flows from *its* node.
+  Cross-node aggregation (distributed `pg`) is deferred.
