@@ -21,6 +21,7 @@ review swarm, not needed for a grounded lookup.
     prompt_len => non_neg_integer(),
     backend => binary(),
     answer_len => non_neg_integer(),
+    answer => binary(),
     step_failed => atom(),
     reason => binary()
 }.
@@ -51,7 +52,7 @@ ask(Ctx, Question, Opts, Flow) ->
                 {ok, Resp} ->
                     Answer = answer_text(Resp),
                     Flow(#{step => llm, phase => done, answer_len => byte_size(Answer)}),
-                    Flow(#{step => answer, phase => done}),
+                    Flow(#{step => answer, phase => done, answer => Answer}),
                     {ok, Answer};
                 {error, R} = Err ->
                     Flow(#{step => error, phase => done, step_failed => llm, reason => err(R)}),

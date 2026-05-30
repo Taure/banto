@@ -12,8 +12,11 @@ serve(Req) ->
         {ok, Rel, ContentType} ->
             File = filename:join([code:priv_dir(banto), "static", "assets", Rel]),
             case file:read_file(File) of
-                {ok, Bin} -> {status, 200, #{~"content-type" => ContentType}, Bin};
-                {error, _} -> {status, 404, #{}, ~"not found"}
+                {ok, Bin} ->
+                    {status, 200,
+                        #{~"content-type" => ContentType, ~"cache-control" => ~"no-store"}, Bin};
+                {error, _} ->
+                    {status, 404, #{}, ~"not found"}
             end;
         error ->
             {status, 404, #{}, ~"not found"}
