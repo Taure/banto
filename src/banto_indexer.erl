@@ -96,7 +96,7 @@ store_files(Ctx, Root, Name, [Path | Rest], Files, Chunks, Pos, Total, Progress)
         case file:read_file(Path) of
             {ok, Content} ->
                 R = relative(Root, Path),
-                S = store_chunks(Ctx, Name, R, kind(Path), chunk(Content)),
+                S = store_chunks(Ctx, Name, R, kind(Path), banto_chunk:chunk(Path, Content)),
                 {
                     case S of
                         0 -> 0;
@@ -121,8 +121,9 @@ store_chunks(Ctx, Name, Rel, Kind, Parts) ->
 
 store_chunks(_Ctx, _Name, _Rel, _Kind, [], _Idx, Stored) ->
     Stored;
-store_chunks(Ctx, Name, Rel, Kind, [Part | Rest], Idx, Stored) ->
-    Meta = #{~"repo" => Name, ~"path" => Rel, ~"kind" => Kind, ~"chunk" => Idx},
+store_chunks(Ctx, Name, Rel, Kind, [{Part, ChunkMeta} | Rest], Idx, Stored) ->
+    Base = #{~"repo" => Name, ~"path" => Rel, ~"kind" => Kind, ~"chunk" => Idx},
+    Meta = maps:merge(Base, ChunkMeta),
     Inc =
         case string:trim(Part) of
             <<>> ->
