@@ -9,7 +9,7 @@
 start(_StartType, _StartArgs) ->
     {ok, Sup} = banto_sup:start_link(),
     ok = install_schema(),
-    _ = nova_handlers:register_handler(stream, fun banto_index_stream:handle/3),
+    _ = nova_handlers:register_handler(stream, fun banto_stream:handle/3),
     ok = maybe_start_mcp(),
     {ok, Sup}.
 

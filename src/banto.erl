@@ -12,7 +12,7 @@ keys, budgets, and audit); embeddings through the configured `bunko_embedder`.
 See `m:banto_config` for the application-environment knobs.
 """.
 
--export([ensure_schema/0, index/2, recall/2, ask/2, ctx/0]).
+-export([ensure_schema/0, index/2, recall/2, recall/3, ask/2, ask/3, ctx/0]).
 -export([main/1]).
 
 -doc false.
@@ -62,6 +62,18 @@ context, and synthesise an answer via the configured LLM. `Opts` as `recall/2`.
 -spec ask(binary(), map()) -> {ok, binary()} | {error, term()}.
 ask(Question, Opts) ->
     banto_knowledge:ask(ctx(), Question, Opts).
+
+-doc "As `recall/2`, invoking `Flow` with a `t:banto_knowledge:step/0` per stage.".
+-spec recall(binary(), map(), fun((banto_knowledge:step()) -> ok)) ->
+    {ok, [bunko_store:hit()]} | {error, term()}.
+recall(Query, Opts, Flow) ->
+    banto_knowledge:recall(ctx(), Query, Opts, Flow).
+
+-doc "As `ask/2`, invoking `Flow` with a `t:banto_knowledge:step/0` per stage.".
+-spec ask(binary(), map(), fun((banto_knowledge:step()) -> ok)) ->
+    {ok, binary()} | {error, term()}.
+ask(Question, Opts, Flow) ->
+    banto_knowledge:ask(ctx(), Question, Opts, Flow).
 
 filter_repo(Hits, undefined) ->
     Hits;
