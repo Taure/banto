@@ -2,7 +2,7 @@
 [{<<"backoff">>,{pkg,<<"backoff">>,<<"1.1.6">>},2},
  {<<"bunko">>,
   {git,"https://github.com/Taure/bunko.git",
-       {ref,"641232606d80c989c80fa7294fe58200c04b4084"}},
+       {ref,"5c6e70adb5068a1fe3814cf064239380bbdd6358"}},
   0},
  {<<"cowboy">>,{pkg,<<"cowboy">>,<<"2.15.0">>},1},
  {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.16.1">>},2},
