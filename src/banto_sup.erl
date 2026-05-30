@@ -10,4 +10,8 @@ start_link() ->
 
 init([]) ->
     SupFlags = #{strategy => one_for_one, intensity => 5, period => 10},
-    {ok, {SupFlags, []}}.
+    Children = [
+        #{id => banto_index_hub, start => {banto_index_hub, start_link, []}, type => worker},
+        #{id => banto_index_sup, start => {banto_index_sup, start_link, []}, type => supervisor}
+    ],
+    {ok, {SupFlags, Children}}.

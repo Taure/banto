@@ -5,7 +5,18 @@ memory tagged with `repo`, `path`, and `kind` metadata. Re-indexing a repo first
 deletes its previous memories, so the operation is idempotent per repo.
 """.
 
--export([index/3, collect_files/1, chunk/1]).
+-export([index/3, index/4, collect_files/1, chunk/1]).
+
+-type progress() :: #{
+    repo := binary(),
+    phase := start | file | done,
+    done := non_neg_integer(),
+    total := non_neg_integer(),
+    chunks := non_neg_integer(),
+    file => binary(),
+    error => binary()
+}.
+-export_type([progress/0]).
 
 %% File types worth indexing for code/doc retrieval.
 -define(EXTS, [~".erl", ~".hrl", ~".ex", ~".exs", ~".md", ~".config", ~".src", ~".app"]).
@@ -16,11 +27,22 @@ deletes its previous memories, so the operation is idempotent per repo.
 -doc "Index `RepoPath` under repo short-name `Name`. Returns `{files, chunks}` counts.".
 -spec index(bunko:context(), file:filename_all(), binary()) -> {ok, map()} | {error, term()}.
 index(Ctx, RepoPath, Name) ->
+    index(Ctx, RepoPath, Name, fun(_) -> ok end).
+
+-doc "Index `RepoPath`, invoking `Progress` with a `t:progress/0` map per file.".
+-spec index(bunko:context(), file:filename_all(), binary(), fun((progress()) -> ok)) ->
+    {ok, map()} | {error, term()}.
+index(Ctx, RepoPath, Name, Progress) ->
     Root = to_path_list(RepoPath),
     case delete_existing(Ctx, Name) of
         ok ->
             Files = collect_files(Root),
-            {Stored, Chunks} = store_files(Ctx, Root, Name, Files, 0, 0),
+            Total = length(Files),
+            Progress(#{repo => Name, phase => start, done => 0, total => Total, chunks => 0}),
+            {Stored, Chunks} = store_files(Ctx, Root, Name, Files, 0, 0, 0, Total, Progress),
+            Progress(#{
+                repo => Name, phase => done, done => Stored, total => Total, chunks => Chunks
+            }),
             {ok, #{files => Stored, chunks => Chunks}};
         {error, _} = Err ->
             Err
@@ -67,24 +89,32 @@ wanted(Path) ->
 
 %% --- storing ---
 
-store_files(_Ctx, _Root, _Name, [], Files, Chunks) ->
+store_files(_Ctx, _Root, _Name, [], Files, Chunks, _Pos, _Total, _Progress) ->
     {Files, Chunks};
-store_files(Ctx, Root, Name, [Path | Rest], Files, Chunks) ->
-    case file:read_file(Path) of
-        {ok, Content} ->
-            Rel = relative(Root, Path),
-            Kind = kind(Path),
-            Parts = chunk(Content),
-            Stored = store_chunks(Ctx, Name, Rel, Kind, Parts),
-            Inc =
-                case Stored of
-                    0 -> 0;
-                    _ -> 1
-                end,
-            store_files(Ctx, Root, Name, Rest, Files + Inc, Chunks + Stored);
-        {error, _} ->
-            store_files(Ctx, Root, Name, Rest, Files, Chunks)
-    end.
+store_files(Ctx, Root, Name, [Path | Rest], Files, Chunks, Pos, Total, Progress) ->
+    {Inc, Stored, Rel} =
+        case file:read_file(Path) of
+            {ok, Content} ->
+                R = relative(Root, Path),
+                S = store_chunks(Ctx, Name, R, kind(Path), chunk(Content)),
+                {
+                    case S of
+                        0 -> 0;
+                        _ -> 1
+                    end,
+                    S,
+                    R
+                };
+            {error, _} ->
+                {0, 0, relative(Root, Path)}
+        end,
+    Pos1 = Pos + 1,
+    Files1 = Files + Inc,
+    Chunks1 = Chunks + Stored,
+    Progress(#{
+        repo => Name, phase => file, file => Rel, done => Pos1, total => Total, chunks => Chunks1
+    }),
+    store_files(Ctx, Root, Name, Rest, Files1, Chunks1, Pos1, Total, Progress).
 
 store_chunks(Ctx, Name, Rel, Kind, Parts) ->
     store_chunks(Ctx, Name, Rel, Kind, Parts, 0, 0).
