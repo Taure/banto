@@ -192,3 +192,35 @@ collect_files_binary_path_test() ->
         _ = file:delete(File),
         _ = file:del_dir(Dir)
     end.
+
+%% --- banto_index_hub pub/sub ---
+
+index_hub_subscribe_and_report_test() ->
+    {ok, Pid} = banto_index_hub:start_link(),
+    try
+        ?assertEqual(#{}, banto_index_hub:subscribe()),
+        banto_index_hub:report(#{repo => ~"r1", phase => file, done => 2, total => 5, chunks => 9}),
+        receive
+            {banto_index_progress, Jobs} ->
+                ?assertMatch(#{~"r1" := #{done := 2, chunks := 9}}, Jobs)
+        after 1000 ->
+            ?assert(false)
+        end,
+        ?assertMatch(#{~"r1" := _}, banto_index_hub:snapshot())
+    after
+        gen_server:stop(Pid)
+    end.
+
+%% --- banto_dashboard_page:jobs_html ---
+
+jobs_html_test() ->
+    Empty = iolist_to_binary(banto_dashboard_page:jobs_html(#{})),
+    ?assertNotEqual(nomatch, binary:match(Empty, ~"no index jobs")),
+    H = iolist_to_binary(
+        banto_dashboard_page:jobs_html(#{
+            ~"kura" => #{repo => ~"kura", phase => file, done => 3, total => 6, chunks => 12}
+        })
+    ),
+    ?assertNotEqual(nomatch, binary:match(H, ~"kura")),
+    ?assertNotEqual(nomatch, binary:match(H, ~"3/6")),
+    ?assertNotEqual(nomatch, binary:match(H, ~"50%")).

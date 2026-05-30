@@ -9,8 +9,8 @@ single Datastar patch of `#results` (one-shot SSE, no held connection).
 %% index/1 takes Req by the Nova controller contract even though it is unused.
 -hank([{unnecessary_function_arguments, [{index, 1, 1}]}]).
 
--export([index/1, search/1]).
--export([page/2, repo_summary_html/1, results_html/1, query_signal/1]).
+-export([index/1, search/1, start_index/1, index_stream/1]).
+-export([page/2, repo_summary_html/1, results_html/1, query_signal/1, jobs_html/1]).
 
 %% GET /
 index(_Req) ->
@@ -29,12 +29,40 @@ search(Req) ->
     Frame = datastar:patch_elements(results_html(Hits), #{selector => ~"#results", mode => inner}),
     {status, 200, maps:from_list(datastar:sse_headers()), iolist_to_binary(Frame)}.
 
+%% POST /dashboard/index - Datastar sends {path, name}; starts a background job.
+start_index(Req) ->
+    {ok, Body, _Req1} = cowboy_req:read_body(Req),
+    Msg =
+        case index_signals(Body) of
+            {ok, Name, Path} ->
+                _ = banto_index_job:start(Name, Path),
+                [~"indexing ", html_escape(Name), ~"..."];
+            {error, _} ->
+                ~"enter both a path and a name."
+        end,
+    Frame = datastar:patch_elements(
+        [~"<span>", Msg, ~"</span>"], #{selector => ~"#index-status", mode => inner}
+    ),
+    {status, 200, maps:from_list(datastar:sse_headers()), iolist_to_binary(Frame)}.
+
+%% GET /dashboard/index/stream - held SSE; banto_index_stream takes over.
+index_stream(_Req) ->
+    {stream, 200, maps:from_list(datastar:sse_headers()), #{}}.
+
 %% --- rendering ---
 
 body(Summary) ->
     [
         ~"<h2>indexed repositories</h2>",
         repo_summary_html(Summary),
+        ~"<h2>index a repo</h2>",
+        ~"<div data-signals-path=\"''\" data-signals-name=\"''\" data-on-load=\"@get('/dashboard/index/stream')\">",
+        ~"<div class=\"search\">",
+        ~"<input type=\"text\" placeholder=\"/repos/personal/gakudan\" data-bind-path>",
+        ~"<input type=\"text\" placeholder=\"name\" data-bind-name>",
+        ~"<button data-on-click=\"@post('/dashboard/index')\">index</button></div>",
+        ~"<div id=\"index-status\" class=\"empty\"></div>",
+        ~"<div id=\"jobs\" class=\"jobs\"><p class=\"empty\">no index jobs yet.</p></div></div>",
         ~"<h2>recall</h2>",
         ~"<div data-signals-query=\"''\"><div class=\"search\">",
         ~"<input type=\"text\" placeholder=\"search across your repos...\" data-bind-query>",
@@ -115,6 +143,60 @@ query_signal(Body) ->
         {ok, #{~"query" := Q}} when is_binary(Q) -> string:trim(Q);
         _ -> ~""
     end.
+
+index_signals(Body) ->
+    case datastar:read_signals(Body) of
+        {ok, #{~"path" := P, ~"name" := N}} when is_binary(P), is_binary(N) ->
+            case {string:trim(P), string:trim(N)} of
+                {<<>>, _} -> {error, empty};
+                {_, <<>>} -> {error, empty};
+                {Path, Name} -> {ok, Name, Path}
+            end;
+        _ ->
+            {error, bad}
+    end.
+
+-doc "Render the live index-job panel (pure).".
+-spec jobs_html(banto_index_hub:jobs()) -> iodata().
+jobs_html(Jobs) when map_size(Jobs) =:= 0 ->
+    ~"<p class=\"empty\">no index jobs yet.</p>";
+jobs_html(Jobs) ->
+    [~"<ul class=\"jobs\">", [job_row(R, P) || {R, P} <- lists:sort(maps:to_list(Jobs))], ~"</ul>"].
+
+job_row(Repo, #{done := Done, total := Total, chunks := Chunks} = P) ->
+    Pct =
+        case Total of
+            0 -> 0;
+            _ -> Done * 100 div Total
+        end,
+    Status =
+        case maps:get(error, P, undefined) of
+            undefined -> phase_label(maps:get(phase, P), Done, Total, Chunks);
+            Err -> [~"error: ", html_escape(Err)]
+        end,
+    [
+        ~"<li><div class=\"job-head\"><span class=\"repo\">",
+        html_escape(Repo),
+        ~"</span><span class=\"status\">",
+        Status,
+        ~"</span></div><div class=\"bar\"><div class=\"bar-fill\" style=\"width:",
+        integer_to_binary(Pct),
+        ~"%\"></div></div></li>"
+    ].
+
+phase_label(done, _Done, _Total, Chunks) ->
+    [~"done - ", integer_to_binary(Chunks), ~" chunks"];
+phase_label(start, _Done, Total, _Chunks) ->
+    [~"starting - ", integer_to_binary(Total), ~" files"];
+phase_label(_File, Done, Total, Chunks) ->
+    [
+        integer_to_binary(Done),
+        ~"/",
+        integer_to_binary(Total),
+        ~" files, ",
+        integer_to_binary(Chunks),
+        ~" chunks"
+    ].
 
 snippet(C) when is_binary(C) ->
     case byte_size(C) =< 500 of
