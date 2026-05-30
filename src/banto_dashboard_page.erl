@@ -6,8 +6,9 @@ reads the `query` signal Datastar posts, runs `banto:recall`, and returns a
 single Datastar patch of `#results` (one-shot SSE, no held connection).
 """.
 
-%% index/1 takes Req by the Nova controller contract even though it is unused.
--hank([{unnecessary_function_arguments, [{index, 1, 1}]}]).
+%% index/1 and index_stream/1 take Req by the Nova controller contract even
+%% though it is unused.
+-hank([{unnecessary_function_arguments, [{index, 1, 1}, {index_stream, 1, 1}]}]).
 
 -export([index/1, search/1, start_index/1, index_stream/1]).
 -export([page/2, repo_summary_html/1, results_html/1, query_signal/1, jobs_html/1]).

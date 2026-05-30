@@ -9,6 +9,9 @@ when the client disconnects.
 
 -export([handle/3]).
 
+%% handle/3 takes the callback arg by the Nova stream-handler contract, unused.
+-hank([{unnecessary_function_arguments, [{handle, 3, 2}]}]).
+
 -define(KEEPALIVE_MS, 25000).
 
 -spec handle(tuple(), term(), cowboy_req:req()) -> no_return().
