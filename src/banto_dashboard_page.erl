@@ -6,12 +6,13 @@ reads the `query` signal Datastar posts, runs `banto:recall`, and returns a
 single Datastar patch of `#results` (one-shot SSE, no held connection).
 """.
 
-%% index/1 and index_stream/1 take Req by the Nova controller contract even
-%% though it is unused.
--hank([{unnecessary_function_arguments, [{index, 1, 1}, {index_stream, 1, 1}]}]).
+%% index/1, index_stream/1 and flow_stream/1 take Req by the Nova controller
+%% contract even though it is unused.
+-hank([{unnecessary_function_arguments, [{index, 1, 1}, {index_stream, 1, 1}, {flow_stream, 1, 1}]}]).
 
--export([index/1, search/1, start_index/1, index_stream/1]).
+-export([index/1, search/1, start_index/1, index_stream/1, flow_stream/1]).
 -export([page/2, repo_summary_html/1, results_html/1, query_signal/1, jobs_html/1]).
+-export([flow_question/1, flow_mode/1, flow_html/1, answer_html/1]).
 
 %% GET /
 index(_Req) ->
@@ -50,6 +51,23 @@ start_index(Req) ->
 index_stream(_Req) ->
     {stream, 200, maps:from_list(datastar:sse_headers()), #{}}.
 
+%% GET /dashboard/flow/stream - held SSE; banto_flow_stream runs the ask/recall.
+flow_stream(_Req) ->
+    {stream, 200, maps:from_list(datastar:sse_headers()), #{}}.
+
+-doc "The `question` signal from a Datastar `@post` body (same idiom as search/1).".
+-spec flow_question(binary()) -> binary().
+flow_question(Body) ->
+    case datastar:read_signals(Body) of
+        {ok, #{~"question" := Q}} when is_binary(Q) -> string:trim(Q);
+        _ -> ~""
+    end.
+
+-doc "Map the flow stream's request path to its mode.".
+-spec flow_mode(binary()) -> ask | recall.
+flow_mode(~"/dashboard/flow/recall") -> recall;
+flow_mode(_Path) -> ask.
+
 %% --- rendering ---
 
 body(Summary) ->
@@ -64,11 +82,13 @@ body(Summary) ->
         ~"<button data-on-click=\"@post('/dashboard/index')\">index</button></div>",
         ~"<div id=\"index-status\" class=\"empty\"></div>",
         ~"<div id=\"jobs\" class=\"jobs\"><p class=\"empty\">no index jobs yet.</p></div></div>",
-        ~"<h2>recall</h2>",
-        ~"<div data-signals-query=\"''\"><div class=\"search\">",
-        ~"<input type=\"text\" placeholder=\"search across your repos...\" data-bind-query>",
-        ~"<button data-on-click=\"@post('/dashboard/search')\">recall</button></div>",
-        ~"<div id=\"results\" class=\"results\"><p class=\"empty\">enter a query above.</p></div></div>"
+        ~"<h2>ask &amp; recall</h2>",
+        ~"<div data-signals-question=\"''\"><div class=\"search\">",
+        ~"<input type=\"text\" placeholder=\"ask across your repos...\" data-bind-question>",
+        ~"<button data-on-click=\"@post('/dashboard/flow/recall')\">recall</button>",
+        ~"<button data-on-click=\"@post('/dashboard/flow/ask')\">ask</button></div>",
+        ~"<div id=\"flow\" class=\"flow\"><p class=\"empty\">the agent's flow will appear here.</p></div>",
+        ~"<div id=\"answer\" class=\"results\"><p class=\"empty\">the answer will appear here.</p></div></div>"
     ].
 
 -doc "Render the indexed-repo summary (pure).".
@@ -198,6 +218,79 @@ phase_label(_File, Done, Total, Chunks) ->
         integer_to_binary(Chunks),
         ~" chunks"
     ].
+
+-doc "Render an ask/recall flow as an ordered step list (pure).".
+-spec flow_html([banto_knowledge:step()]) -> iodata().
+flow_html([]) ->
+    ~"<p class=\"empty\">the agent's flow will appear here.</p>";
+flow_html(Steps) ->
+    [~"<ol class=\"flow\">", [step_row(S) || S <- Steps], ~"</ol>"].
+
+step_row(#{step := recall, phase := start} = S) ->
+    flow_li(~"recall", [
+        ~"searching for ", integer_to_binary(maps:get(question_len, S, 0)), ~" bytes"
+    ]);
+step_row(#{step := recall, phase := done} = S) ->
+    flow_li(~"recall", [
+        integer_to_binary(maps:get(count, S, 0)),
+        ~" chunks<ul class=\"sources\">",
+        [source_li(H) || H <- maps:get(sources, S, [])],
+        ~"</ul>"
+    ]);
+step_row(#{step := prompt} = S) ->
+    flow_li(~"prompt", [
+        ~"built ",
+        integer_to_binary(maps:get(prompt_len, S, 0)),
+        ~" bytes for ",
+        html_escape(maps:get(model, S, ~"?"))
+    ]);
+step_row(#{step := llm, phase := start} = S) ->
+    flow_li(~"synthesise", [~"calling ", html_escape(maps:get(backend, S, ~"?"))]);
+step_row(#{step := llm, phase := done} = S) ->
+    flow_li(~"synthesise", [~"answer ", integer_to_binary(maps:get(answer_len, S, 0)), ~" bytes"]);
+step_row(#{step := answer}) ->
+    flow_li(~"answer", ~"done");
+step_row(#{step := error} = S) ->
+    flow_li(~"error", [
+        ~"failed at ",
+        atom_to_binary(maps:get(step_failed, S, unknown)),
+        ~": ",
+        html_escape(maps:get(reason, S, ~""))
+    ]);
+step_row(_Step) ->
+    [].
+
+source_li(#{repo := R, path := P} = H) ->
+    [
+        ~"<li>",
+        html_escape(R),
+        ~"/",
+        html_escape(P),
+        ~" <span class=\"kind\">",
+        html_escape(maps:get(kind, H, ~"")),
+        ~"</span></li>"
+    ].
+
+flow_li(Label, Body) ->
+    [
+        ~"<li class=\"flow-step\"><span class=\"label\">",
+        Label,
+        ~"</span><span class=\"detail\">",
+        Body,
+        ~"</span></li>"
+    ].
+
+-doc "Render the final answer (ask) or hit list (recall) for the #answer area (pure).".
+-spec answer_html({ok, binary()} | {hits, [bunko_store:hit()]} | {error, term()}) -> iodata().
+answer_html({ok, Answer}) ->
+    [~"<div class=\"answer\"><pre>", html_escape(Answer), ~"</pre></div>"];
+answer_html({hits, Hits}) ->
+    results_html(Hits);
+answer_html({error, Reason}) ->
+    [~"<p class=\"empty\">error: ", html_escape(to_bin(Reason)), ~"</p>"].
+
+to_bin(B) when is_binary(B) -> B;
+to_bin(R) -> iolist_to_binary(io_lib:format("~p", [R])).
 
 snippet(C) when is_binary(C) ->
     case byte_size(C) =< 500 of

@@ -69,3 +69,11 @@ h2 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spa
 .job-head .status { color: var(--muted); }
 .bar { height: 6px; background: var(--border, #2a2a2a); border-radius: 3px; margin-top: 4px; overflow: hidden; }
 .bar-fill { height: 100%; background: var(--accent); transition: width .3s ease; }
+
+.flow { list-style: none; padding: 0; margin: 0; }
+.flow-step { display: flex; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--border, #2a2a2a); }
+.flow-step .label { color: var(--accent); font-weight: 600; min-width: 90px; }
+.flow-step .detail { color: var(--ink); }
+.flow .sources { list-style: none; padding: 2px 0 0; margin: 0; font-size: 12px; color: var(--muted); }
+.flow .sources .kind { opacity: 0.6; }
+.answer pre { white-space: pre-wrap; color: var(--ink); margin: 0; }

@@ -7,21 +7,73 @@ completion - the multi-agent orchestration (gakudan fanout) is reserved for the
 review swarm, not needed for a grounded lookup.
 """.
 
--export([ask/3, build_request/3]).
+-export([ask/3, ask/4, recall/4, build_request/3]).
+-export_type([step/0]).
+
+-type step() :: #{
+    step := recall | prompt | llm | answer | error,
+    phase := start | done,
+    question_len => non_neg_integer(),
+    repo_filter => binary() | undefined,
+    count => non_neg_integer(),
+    sources => [map()],
+    model => binary(),
+    prompt_len => non_neg_integer(),
+    backend => binary(),
+    answer_len => non_neg_integer(),
+    step_failed => atom(),
+    reason => binary()
+}.
 
 -doc "Recall context for `Question` and synthesise a grounded answer.".
 -spec ask(bunko:context(), binary(), map()) -> {ok, binary()} | {error, term()}.
 ask(Ctx, Question, Opts) ->
-    case bunko:recall(Ctx, Question, Opts) of
-        {ok, Hits0} ->
-            Hits = filter_repo(Hits0, maps:get(repo, Opts, undefined)),
+    ask(Ctx, Question, Opts, fun(_) -> ok end).
+
+-doc "As `ask/3`, invoking `Flow` with a `t:step/0` map at each stage.".
+-spec ask(bunko:context(), binary(), map(), fun((step()) -> ok)) ->
+    {ok, binary()} | {error, term()}.
+ask(Ctx, Question, Opts, Flow) ->
+    case recall(Ctx, Question, Opts, Flow) of
+        {ok, Hits} ->
+            Model = banto_config:model(),
             {Mod, LlmOpts} = banto_config:llm(),
-            Req = build_request(banto_config:model(), Question, Hits),
+            Req = build_request(Model, Question, Hits),
+            Flow(#{
+                step => prompt,
+                phase => done,
+                model => Model,
+                prompt_len => prompt_len(Req),
+                count => length(Hits)
+            }),
+            Flow(#{step => llm, phase => start, backend => ref_name(Mod), model => Model}),
             case Mod:complete(Req, LlmOpts) of
-                {ok, Resp} -> {ok, answer_text(Resp)};
-                {error, _} = Err -> Err
+                {ok, Resp} ->
+                    Answer = answer_text(Resp),
+                    Flow(#{step => llm, phase => done, answer_len => byte_size(Answer)}),
+                    Flow(#{step => answer, phase => done}),
+                    {ok, Answer};
+                {error, R} = Err ->
+                    Flow(#{step => error, phase => done, step_failed => llm, reason => err(R)}),
+                    Err
             end;
         {error, _} = Err ->
+            Err
+    end.
+
+-doc "Recall the top-k hits for `Query`, invoking `Flow` with `recall` steps.".
+-spec recall(bunko:context(), binary(), map(), fun((step()) -> ok)) ->
+    {ok, [bunko_store:hit()]} | {error, term()}.
+recall(Ctx, Query, Opts, Flow) ->
+    Repo = maps:get(repo, Opts, undefined),
+    Flow(#{step => recall, phase => start, question_len => byte_size(Query), repo_filter => Repo}),
+    case bunko:recall(Ctx, Query, Opts) of
+        {ok, Hits0} ->
+            Hits = filter_repo(Hits0, Repo),
+            Flow(#{step => recall, phase => done, count => length(Hits), sources => sources(Hits)}),
+            {ok, Hits};
+        {error, R} = Err ->
+            Flow(#{step => error, phase => done, step_failed => recall, reason => err(R)}),
             Err
     end.
 
@@ -63,3 +115,24 @@ filter_repo(Hits, undefined) ->
     Hits;
 filter_repo(Hits, Repo) ->
     [H || H <- Hits, maps:get(~"repo", maps:get(metadata, H, #{}), undefined) =:= Repo].
+
+sources(Hits) ->
+    [
+        #{
+            repo => meta(~"repo", H),
+            path => meta(~"path", H),
+            kind => meta(~"kind", H),
+            distance => maps:get(distance, H, 0.0)
+        }
+     || H <- Hits
+    ].
+
+meta(Key, Hit) ->
+    maps:get(Key, maps:get(metadata, Hit, #{}), ~"?").
+
+prompt_len(#{messages := [#{content := Content} | _]}) -> byte_size(Content);
+prompt_len(_) -> 0.
+
+ref_name(Mod) when is_atom(Mod) -> atom_to_binary(Mod).
+
+err(Reason) -> iolist_to_binary(io_lib:format("~p", [Reason])).
