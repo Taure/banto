@@ -1,8 +1,16 @@
+<div align="center">
+
 # banto
 
-[![CI](https://github.com/Taure/banto/actions/workflows/ci.yml/badge.svg)](https://github.com/Taure/banto/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/Taure/banto)](LICENSE.md)
-[![Erlang](https://img.shields.io/badge/erlang-29%2B-blue)](.tool-versions)
+[![CI](https://github.com/Taure/banto/actions/workflows/ci.yml/badge.svg)](https://github.com/Taure/banto/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/Taure/banto)](LICENSE.md) [![Erlang](https://img.shields.io/badge/erlang-29%2B-blue)](.tool-versions)
+
+**A self-hosted agent swarm for your repositories: ask across all of them, review diffs, audit every LLM call.**
+
+<!-- Demo: record assets/demo.gif (see assets/RECORDING.md), then uncomment:
+<img src="assets/demo.gif" alt="banto answering a cross-repo question, then running the review swarm" width="820">
+-->
+
+</div>
 
 **banto** (番頭, the head clerk who runs the shop) points a swarm of agents at your
 repositories. It indexes them into one semantic memory, answers questions across
@@ -10,10 +18,6 @@ all of them with cited sources, and runs a grounded code-review swarm - entirely
 self-hosted on the BEAM, with every LLM call routed through an audited gateway. It
 also exposes `recall` / `ask` / `index_repo` as MCP tools, so Claude Code or any
 MCP client can use it from inside any repo.
-
-<!-- Demo: record assets/demo.gif (see assets/RECORDING.md), then uncomment the next line.
-![banto answering a cross-repo question, then running the review swarm](assets/demo.gif)
--->
 
 banto is the showcase consumer of the [gakudan](https://github.com/Taure/gakudan)
 multi-agent ecosystem - it wires five pillars into one service:
