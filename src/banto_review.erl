@@ -6,8 +6,10 @@ concurrently, each grounded by the same bunko-recalled repository context
 (ADRs, conventions, prior code). Collects each agent's finding from the run
 blackboard and renders one review.
 
-This is where gakudan's orchestration earns its keep: parallel specialist
-perspectives on one diff, not a single prompt.
+Reviewers request schema-constrained structured findings (`m:banto_finding`), so
+findings parse robustly rather than via text scraping; a model that returns plain
+prose still renders. This is where gakudan's orchestration earns its keep:
+parallel specialist perspectives on one diff, not a single prompt.
 """.
 
 -export([review/2, agents/0, build_kickoff/2, format/1]).
@@ -55,7 +57,7 @@ format(Reviews) ->
 %% --- internal ---
 
 section(#{agent := Agent, content := Content}) ->
-    [~"\n## ", atom_to_binary(Agent), ~"\n\n", Content, ~"\n"].
+    [~"\n## ", atom_to_binary(Agent), ~"\n\n", banto_finding:render(Content), ~"\n"].
 
 recall_context(Diff, Opts) ->
     Limit = maps:get(context_limit, Opts, 6),
