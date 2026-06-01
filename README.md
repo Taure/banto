@@ -27,14 +27,21 @@ All repos share one bunko namespace; each memory carries `repo`, `path`, and
 it.
 
 - `banto_indexer` walks a repo, chunks its source and docs, embeds each chunk,
-  and stores it in bunko.
-- `banto_knowledge` recalls the most relevant chunks for a question and
-  synthesises a grounded answer (with source citations) via the configured LLM.
-- `banto_mcp_*` exposes `recall`, `ask`, and `index_repo` over Streamable HTTP.
+  and stores it in bunko in one batched, content-hash-cached embedding call per
+  file, so re-indexing is fast.
+- `banto_knowledge` recalls the most relevant chunks for a question - hybrid
+  (keyword + vector) search, narrowed at the database by a `repo` metadata filter
+  and a distance threshold - and synthesises a grounded answer (with source
+  citations) via the configured LLM, wrapped in a retry/fallback backend so
+  transient upstream errors do not fail the call.
+- `banto_mcp_*` exposes `recall`, `ask`, and `index_repo` as MCP tools (with
+  read-only / destructive annotations) and the indexed repos as MCP resources,
+  over Streamable HTTP or a stdio transport (`banto_cli mcp-stdio`).
 - `banto_review` fans out specialist reviewer agents (security, conventions,
   tests, architecture) over a diff via gakudan, each grounded by the same
-  recalled context; `banto_review_eval` is a saiten benchmark that gates the
-  swarm in CI.
+  recalled context and returning schema-constrained structured findings;
+  `banto_review_eval` is a saiten benchmark (self-consistency judge, JUnit output,
+  optional regression gate) that gates the swarm in CI.
 - `banto_router` + `banto_dashboard_page` serve a Nova + Datastar memory console
   on `:8081`: the indexed-repo summary and a live recall search.
 
@@ -54,9 +61,10 @@ ok = banto:ensure_schema().
 ```
 
 The MCP server starts on `:8080` at `/mcp`; point your Claude Code MCP config at
-it to use the tools directly. A CLI (`rebar3 escriptize` -> `banto_cli
-review|ask|recall|index`) and an opt-in PR-review GitHub Action are also
-included.
+it to use the tools directly, or run `banto_cli mcp-stdio` to serve the same tools
+and repo resources over stdio for a desktop client that launches a local server. A
+CLI (`rebar3 escriptize` -> `banto_cli review|ask|recall|index|maintain|mcp-stdio`)
+and an opt-in PR-review GitHub Action are also included.
 
 ## Configuration
 

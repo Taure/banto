@@ -5,6 +5,7 @@
     swarm_returns_all_reviews/1,
     security_reviewer_catches_injection/1,
     saiten_gate_passes/1,
+    saiten_emits_junit_and_no_regression/1,
     maintenance_report/1
 ]).
 
@@ -16,6 +17,7 @@ all() ->
         swarm_returns_all_reviews,
         security_reviewer_catches_injection,
         saiten_gate_passes,
+        saiten_emits_junit_and_no_regression,
         maintenance_report
     ].
 
@@ -52,6 +54,27 @@ security_reviewer_catches_injection(_Config) ->
 saiten_gate_passes(_Config) ->
     %% Runs the swarm over the planted-bug dataset and gates on the scorecard.
     ?assertEqual(ok, saiten:assert_passed(saiten:run(banto_review_eval:suite()))).
+
+saiten_emits_junit_and_no_regression(Config) ->
+    Priv = ?config(priv_dir, Config),
+    Junit = filename:join(Priv, "review-eval-junit.xml"),
+    Baseline = filename:join(Priv, "review-eval-baseline.json"),
+    application:set_env(banto, eval_junit_path, Junit),
+    application:set_env(banto, eval_baseline_path, Baseline),
+    try
+        {ok, Scorecard} = saiten:run(banto_review_eval:suite()),
+        ?assert(filelib:is_file(Junit)),
+        {ok, Xml} = file:read_file(Junit),
+        ?assertNotEqual(nomatch, binary:match(Xml, ~"<testsuite")),
+        %% no baseline yet -> no-regression is a no-op pass
+        ?assertEqual(ok, banto_review_eval:assert_no_regression()),
+        %% write the current scorecard as the baseline, then it must not regress
+        ok = saiten_sink_json:write(Scorecard, #{path => Baseline}),
+        ?assertEqual(ok, banto_review_eval:assert_no_regression())
+    after
+        application:unset_env(banto, eval_junit_path),
+        application:unset_env(banto, eval_baseline_path)
+    end.
 
 maintenance_report(Config) ->
     Dir = filename:join(?config(priv_dir, Config), "maint_repo"),
