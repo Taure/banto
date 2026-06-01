@@ -14,11 +14,23 @@ multi-agent ecosystem - it wires five pillars into one service:
 
 | Pillar | Role in banto |
 | --- | --- |
-| [gakudan](https://github.com/Taure/gakudan) | LLM backend (via sekisho); fanout review swarm (P2) |
-| [bunko](https://github.com/Taure/bunko) | the pgvector semantic store + embedder seam |
-| [sekisho](https://github.com/Taure/sekisho) | gateway for LLM + embedding keys, budgets, audit |
-| [madoguchi](https://github.com/Taure/madoguchi) | exposes recall / ask / index_repo as MCP tools |
-| [saiten](https://github.com/Taure/saiten) | grades the review swarm in CI (P2) |
+| [gakudan](https://github.com/Taure/gakudan) | LLM backend (via sekisho) with retry/fallback; fanout review swarm with structured findings |
+| [bunko](https://github.com/Taure/bunko) | pgvector store with hybrid (keyword + vector) search, DB-side metadata filtering, batched cached embedding |
+| [sekisho](https://github.com/Taure/sekisho) | gateway for LLM + embedding keys, budgets, cost accounting, tamper-evident audit |
+| [madoguchi](https://github.com/Taure/madoguchi) | recall / ask / index_repo as MCP tools + repo resources, over HTTP and stdio |
+| [saiten](https://github.com/Taure/saiten) | grades the review swarm in CI: self-consistency judge, JUnit, regression gate |
+
+## Features
+
+- **Cross-repo semantic memory.** One bunko namespace over all your repos; every chunk carries `repo` / `path` / `kind` metadata.
+- **Hybrid retrieval.** Keyword (BM25) and vector search fused at the database, narrowed by a `repo` metadata filter and a distance threshold so only relevant context reaches the model.
+- **Fast indexing.** Batched, content-hash-cached embeddings: one call per file, and unchanged content is never re-embedded.
+- **Grounded answers.** `ask` cites the source paths it used and declines to answer beyond the recalled context; the LLM call is wrapped in a retry/fallback backend so a transient upstream error does not fail it.
+- **Review swarm.** Specialist reviewers (security, conventions, tests, architecture) fan out over a diff via gakudan, each grounded by recall and returning schema-validated structured findings.
+- **Self-grading in CI.** A saiten benchmark gates the swarm with a self-consistency judge, JUnit output, and an optional regression gate against a baseline.
+- **MCP everywhere.** `recall` / `ask` / `index_repo` as MCP tools with read-only / destructive annotations, plus indexed repos as MCP resources, served over Streamable HTTP or stdio (`banto_cli mcp-stdio`) for desktop clients that launch a local server.
+- **Audited and budgeted.** All LLM and embedding traffic routes through the sekisho gateway: virtual keys, spend budgets, cost accounting, and a tamper-evident audit log.
+- **Live console.** A Nova + Datastar memory dashboard on `:8081`: indexed-repo summary and live recall search.
 
 ## How it works
 
