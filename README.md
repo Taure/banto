@@ -1,5 +1,9 @@
 # banto
 
+[![CI](https://github.com/Taure/banto/actions/workflows/ci.yml/badge.svg)](https://github.com/Taure/banto/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/Taure/banto)](LICENSE.md)
+[![Erlang](https://img.shields.io/badge/erlang-29%2B-blue)](.tool-versions)
+
 **banto** (番頭, the head clerk who runs the shop) is a multi-agent repo
 concierge for the BEAM. Point it at your repositories; it indexes them into a
 shared semantic memory and answers questions across them - exposed as MCP tools,
