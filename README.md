@@ -95,12 +95,6 @@ and repo resources over stdio for a desktop client that launches a local server.
 CLI (`rebar3 escriptize` -> `banto_cli review|ask|recall|index|maintain|mcp-stdio`)
 and an opt-in PR-review GitHub Action are also included.
 
-## Configuration
-
-Defaults keep CI offline (a deterministic stub embedder + stub LLM). For real
-use, route through a [sekisho](https://github.com/Taure/sekisho) gateway - see
-`m:banto_config` and `config/dev_sys.config.src`.
-
 ## Status
 
 All phases are in: P1 (indexing, recall, ask, MCP surface), P2 (PR review swarm +
