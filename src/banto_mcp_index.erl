@@ -2,9 +2,18 @@
 -moduledoc "MCP tool: index (or re-index) a repository into the shared memory.".
 -behaviour(madoguchi_tool).
 
--export([name/0, description/0, input_schema/0, call/1]).
+-export([name/0, description/0, input_schema/0, annotations/0, call/1]).
 
 name() -> ~"index_repo".
+
+%% Not read-only: it writes to (and replaces) the shared memory for a repo.
+annotations() ->
+    #{
+        title => ~"Index a repository",
+        readOnlyHint => false,
+        destructiveHint => true,
+        idempotentHint => true
+    }.
 
 description() ->
     ~"Index a repository directory into banto's shared memory so it becomes searchable via recall/ask. Re-indexing replaces the repo's previous memories. Returns the number of files and chunks stored.".

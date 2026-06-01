@@ -28,11 +28,14 @@ install_schema() ->
     end.
 
 %% In the `dashboard` role Nova serves the public surface and the MCP listener is
-%% not needed. In the `mcp` role (or locally, when BANTO_ROLE is unset) start the
-%% madoguchi MCP server. Nova's own listener always starts from its app config.
+%% not needed; in the `stdio` role the CLI drives the stdio transport itself and
+%% the HTTP listener must not touch stdout. Otherwise start the madoguchi MCP HTTP
+%% server. Nova's own listener always starts from its app config.
 maybe_start_mcp() ->
     case os:getenv("BANTO_ROLE") of
         "dashboard" ->
+            ok;
+        "stdio" ->
             ok;
         _ ->
             _ = banto_mcp:start(),

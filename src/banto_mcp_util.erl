@@ -3,7 +3,7 @@
 
 -include_lib("kernel/include/logger.hrl").
 
--export([opts/1, format_hits/1, reason/1]).
+-export([opts/1, format_hits/1, hits_json/1, reason/1]).
 
 -doc "Build recall/ask Opts from MCP tool arguments (limit + optional repo).".
 -spec opts(map()) -> map().
@@ -20,6 +20,18 @@ format_hits([]) ->
     ~"No matches found.";
 format_hits(Hits) ->
     iolist_to_binary(lists:join(~"\n\n", [format_hit(H) || H <- Hits])).
+
+-doc "Render recall hits as a structured-content list (repo/path/content).".
+-spec hits_json([bunko_store:hit()]) -> [map()].
+hits_json(Hits) ->
+    [
+        #{
+            ~"repo" => maps:get(~"repo", Meta, ~"?"),
+            ~"path" => maps:get(~"path", Meta, ~"?"),
+            ~"content" => maps:get(content, H, ~"")
+        }
+     || H <- Hits, Meta <- [maps:get(metadata, H, #{})]
+    ].
 
 format_hit(#{content := Content} = Hit) ->
     Meta = maps:get(metadata, Hit, #{}),
