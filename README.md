@@ -4,10 +4,16 @@
 [![License](https://img.shields.io/github/license/Taure/banto)](LICENSE.md)
 [![Erlang](https://img.shields.io/badge/erlang-29%2B-blue)](.tool-versions)
 
-**banto** (番頭, the head clerk who runs the shop) is a multi-agent repo
-concierge for the BEAM. Point it at your repositories; it indexes them into a
-shared semantic memory and answers questions across them - exposed as MCP tools,
-so a Claude Code session in any repo can `recall`, `ask`, or `index_repo`.
+**banto** (番頭, the head clerk who runs the shop) points a swarm of agents at your
+repositories. It indexes them into one semantic memory, answers questions across
+all of them with cited sources, and runs a grounded code-review swarm - entirely
+self-hosted on the BEAM, with every LLM call routed through an audited gateway. It
+also exposes `recall` / `ask` / `index_repo` as MCP tools, so Claude Code or any
+MCP client can use it from inside any repo.
+
+<!-- Demo: record assets/demo.gif (see assets/RECORDING.md), then uncomment the next line.
+![banto answering a cross-repo question, then running the review swarm](assets/demo.gif)
+-->
 
 banto is the showcase consumer of the [gakudan](https://github.com/Taure/gakudan)
 multi-agent ecosystem - it wires five pillars into one service:
@@ -57,20 +63,27 @@ it.
 - `banto_router` + `banto_dashboard_page` serve a Nova + Datastar memory console
   on `:8081`: the indexed-repo summary and a live recall search.
 
-## Quick start
+## Quick start (offline, no API key)
+
+banto boots on a deterministic stub embedder and stub LLM, so it runs end to end
+with zero credentials - point it at a real model only when you want real answers.
 
 ```bash
+git clone https://github.com/Taure/banto && cd banto
 docker compose up -d            # pgvector Postgres on :5559
-rebar3 shell                    # starts banto with config/dev_sys.config.src
+rebar3 shell                    # boots with the stub embedder + stub LLM
 ```
 
 ```erlang
 ok = banto:ensure_schema().
-{ok, _} = banto:index("/path/to/kura", #{name => ~"kura"}).
-{ok, Hits} = banto:recall(~"how is the connection pool configured?", #{limit => 5}).
-{ok, Answer} = banto:ask(~"what does kura_query:where/2 expect?", #{repo => ~"kura"}).
-{ok, Reviews} = banto_review:review(Diff, #{repo => ~"kura"}), banto_review:format(Reviews).
+{ok, _} = banto:index("/path/to/some/repo", #{name => ~"myrepo"}).
+{ok, Hits} = banto:recall(~"where is the connection pool configured?", #{limit => 5}).
+{ok, Answer} = banto:ask(~"what does that function expect?", #{repo => ~"myrepo"}).
+{ok, Reviews} = banto_review:review(Diff, #{repo => ~"myrepo"}), banto_review:format(Reviews).
 ```
+
+For real answers, route through a [sekisho](https://github.com/Taure/sekisho)
+gateway - see `m:banto_config` and `config/dev_sys.config.src`.
 
 The MCP server starts on `:8080` at `/mcp`; point your Claude Code MCP config at
 it to use the tools directly, or run `banto_cli mcp-stdio` to serve the same tools
