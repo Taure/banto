@@ -8,6 +8,7 @@ banto_cli recall <query>        # semantic search across indexed repos
 banto_cli ask <question>        # grounded answer across indexed repos
 banto_cli review <diff-file>    # run the review swarm over a diff
 banto_cli maintain <path> <name> # dependency + doc-drift maintenance report
+banto_cli mcp-stdio             # run banto as a local MCP server over stdio
 ```
 
 Reads the same `banto` app configuration as the service (see `m:banto_config`);
@@ -20,6 +21,7 @@ provide it via `-config` or the application environment.
 main(Args) ->
     case parse(Args) of
         {ok, Cmd} ->
+            _ = maybe_stdio_role(Cmd),
             {ok, _} = application:ensure_all_started(banto),
             halt(run(Cmd));
         {error, usage} ->
@@ -34,14 +36,22 @@ main(Args) ->
         | {recall, binary()}
         | {ask, binary()}
         | {review, string()}
-        | {maintain, string(), binary()}}
+        | {maintain, string(), binary()}
+        | mcp_stdio}
     | {error, usage}.
 parse(["index", Path, Name]) -> {ok, {index, Path, list_to_binary(Name)}};
 parse(["recall", Query]) -> {ok, {recall, list_to_binary(Query)}};
 parse(["ask", Question]) -> {ok, {ask, list_to_binary(Question)}};
 parse(["review", File]) -> {ok, {review, File}};
 parse(["maintain", Path, Name]) -> {ok, {maintain, Path, list_to_binary(Name)}};
+parse(["mcp-stdio"]) -> {ok, mcp_stdio};
 parse(_) -> {error, usage}.
+
+%% In stdio mode stdout carries MCP protocol traffic, so the HTTP listener (and
+%% nothing else) must not be started by app boot: mark the role so
+%% banto_app:maybe_start_mcp/0 skips the HTTP transport.
+maybe_stdio_role(mcp_stdio) -> os:putenv("BANTO_ROLE", "stdio");
+maybe_stdio_role(_) -> ok.
 
 %% --- dispatch ---
 
@@ -86,6 +96,9 @@ run({review, File}) ->
 run({maintain, Path, Name}) ->
     {ok, Report} = banto_maintenance:run(Path, #{repo => Name}),
     io:format("~s~n", [Report]),
+    0;
+run(mcp_stdio) ->
+    ok = banto_mcp:start_stdio(),
     0.
 
 fail(Reason) ->
@@ -98,4 +111,5 @@ usage() ->
     "  recall <query>        semantic search across indexed repos\n"
     "  ask <question>        grounded answer across indexed repos\n"
     "  review <diff-file>    run the review swarm over a diff\n"
-    "  maintain <path> <name>  dependency + doc-drift maintenance report\n".
+    "  maintain <path> <name>  dependency + doc-drift maintenance report\n"
+    "  mcp-stdio             run banto as a local MCP server over stdio\n".

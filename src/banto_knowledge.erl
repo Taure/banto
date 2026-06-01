@@ -7,7 +7,7 @@ completion - the multi-agent orchestration (gakudan fanout) is reserved for the
 review swarm, not needed for a grounded lookup.
 """.
 
--export([ask/3, ask/4, recall/4, build_request/3]).
+-export([ask/3, ask/4, recall/4, recall_opts/2, build_request/3]).
 -export_type([step/0]).
 
 -type step() :: #{
@@ -38,7 +38,7 @@ ask(Ctx, Question, Opts, Flow) ->
     case recall(Ctx, Question, Opts, Flow) of
         {ok, Hits} ->
             Model = banto_config:model(),
-            {Mod, LlmOpts} = banto_config:llm(),
+            {Mod, LlmOpts} = banto_config:resilient_llm(),
             Req = build_request(Model, Question, Hits),
             Flow(#{
                 step => prompt,
@@ -68,14 +68,37 @@ ask(Ctx, Question, Opts, Flow) ->
 recall(Ctx, Query, Opts, Flow) ->
     Repo = maps:get(repo, Opts, undefined),
     Flow(#{step => recall, phase => start, question_len => byte_size(Query), repo_filter => Repo}),
-    case bunko:recall(Ctx, Query, Opts) of
-        {ok, Hits0} ->
-            Hits = filter_repo(Hits0, Repo),
+    case bunko:recall(Ctx, Query, recall_opts(Opts, Repo)) of
+        {ok, Hits} ->
             Flow(#{step => recall, phase => done, count => length(Hits), sources => sources(Hits)}),
             {ok, Hits};
         {error, R} = Err ->
             Flow(#{step => error, phase => done, step_failed => recall, reason => err(R)}),
             Err
+    end.
+
+-doc """
+Translate banto recall `Opts` plus a `Repo` filter into bunko recall options:
+push the repo filter and distance threshold into bunko so the DB does the work,
+and enable hybrid (keyword + vector) recall when configured - exact identifiers
+and error codes matter for code retrieval.
+""".
+-spec recall_opts(map(), binary() | undefined) -> map().
+recall_opts(Opts, Repo) ->
+    Base = maps:without([repo], Opts),
+    WithFilter =
+        case Repo of
+            undefined -> Base;
+            _ -> Base#{filter => #{~"repo" => Repo}}
+        end,
+    WithThreshold =
+        case banto_config:max_distance() of
+            undefined -> WithFilter;
+            Max -> WithFilter#{max_distance => Max}
+        end,
+    case banto_config:hybrid() of
+        true -> WithThreshold#{hybrid => true};
+        false -> WithThreshold
     end.
 
 -doc "Build the `gakudan_llm` request: system rules + recalled context + question.".
@@ -111,11 +134,6 @@ answer_text(#{content := Blocks}) ->
     iolist_to_binary([T || #{type := text, text := T} <- Blocks]);
 answer_text(_) ->
     ~"".
-
-filter_repo(Hits, undefined) ->
-    Hits;
-filter_repo(Hits, Repo) ->
-    [H || H <- Hits, maps:get(~"repo", maps:get(metadata, H, #{}), undefined) =:= Repo].
 
 sources(Hits) ->
     [

@@ -5,14 +5,21 @@
     index_and_recall/1,
     ask_grounds_in_context/1,
     reindex_is_idempotent/1,
-    recall_repo_filter/1
+    recall_repo_filter/1,
+    mcp_resources_list_and_read/1
 ]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 all() ->
-    [index_and_recall, ask_grounds_in_context, reindex_is_idempotent, recall_repo_filter].
+    [
+        index_and_recall,
+        ask_grounds_in_context,
+        reindex_is_idempotent,
+        recall_repo_filter,
+        mcp_resources_list_and_read
+    ].
 
 init_per_suite(Config) ->
     application:set_env(bunko, embedding_dim, 8),
@@ -66,6 +73,17 @@ recall_repo_filter(Config) ->
     ?assert(length(Hits) >= 1),
     Repos = lists:usort([maps:get(~"repo", maps:get(metadata, H)) || H <- Hits]),
     ?assertEqual([~"alpha"], Repos).
+
+mcp_resources_list_and_read(Config) ->
+    {Root, _} = make_fixture(Config, ~"resrepo"),
+    {ok, _} = banto:index(Root, #{name => ~"resrepo"}),
+    Resources = banto_mcp_resources:list(),
+    Uris = [maps:get(uri, R) || R <- Resources],
+    ?assert(lists:member(~"banto://repo/resrepo", Uris)),
+    {ok, [Contents]} = banto_mcp_resources:read(~"banto://repo/resrepo"),
+    Text = maps:get(text, Contents),
+    ?assertNotEqual(nomatch, binary:match(Text, ~"lib/greeting.erl")),
+    ?assertEqual({error, not_found}, banto_mcp_resources:read(~"banto://repo/nope")).
 
 %% --- helpers ---
 

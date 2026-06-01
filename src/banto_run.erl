@@ -13,7 +13,7 @@ the per-agent extraction live here.
 -doc """
 Run `Agents` (modules implementing `gakudan_agent`) once over `Kickoff`. Returns
 one entry per agent: `#{agent := atom(), content := binary()}`. `Opts`: `timeout`
-(ms), `llm` (a `gakudan_llm` ref; defaults to `banto_config:llm/0`).
+(ms), `llm` (a `gakudan_llm` ref; defaults to `banto_config:resilient_llm/0`).
 """.
 -spec run([module()], binary(), map()) -> {ok, [map()]} | {error, term()}.
 run(Agents, Kickoff, Opts) ->
@@ -21,7 +21,7 @@ run(Agents, Kickoff, Opts) ->
         gakudan:start_run(#{
             agents => Agents,
             router => {gakudan_router_fanout, #{rounds => 1}},
-            llm => maps:get(llm, Opts, banto_config:llm()),
+            llm => maps:get(llm, Opts, banto_config:resilient_llm()),
             max_turns => length(Agents) + 2
         })
     of

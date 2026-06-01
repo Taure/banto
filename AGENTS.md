@@ -13,28 +13,38 @@ all five pillars together in one service.
 All under https://github.com/Taure:
 
 - **[gakudan](https://github.com/Taure/gakudan)** - agent orchestration runtime.
-  banto uses its `gakudan_llm` backend (pointed at sekisho) and, from P2, its
-  fanout router for the review swarm.
+  banto uses its `gakudan_llm` backend (pointed at sekisho, wrapped in
+  `gakudan_llm_retry`/`gakudan_llm_fallback`), its fanout router for the review
+  swarm, and structured output (`response_format` + `gakudan_validator_json`).
 - **[bunko](https://github.com/Taure/bunko)** - agent memory + RAG. banto's
-  semantic store (`bunko_store_pgvector`), embedder seam, and consolidation.
+  semantic store (`bunko_store_pgvector`), batched cached embedding
+  (`remember_many`), hybrid recall, metadata filters, and consolidation.
 - **[sekisho](https://github.com/Taure/sekisho)** - LLM gateway / control plane.
-  All of banto's LLM + embedding traffic routes here for keys, budgets, audit.
+  All of banto's LLM + embedding traffic routes here for keys, budgets, audit
+  (reached via gateway config, not a dep).
 - **[madoguchi](https://github.com/Taure/madoguchi)** - MCP *server* framework.
-  banto exposes `recall` / `ask` / `index_repo` as MCP tools through it.
+  banto exposes `recall` / `ask` / `index_repo` as annotated MCP tools and its
+  indexed repos as MCP resources, over HTTP and stdio.
 - **[saiten](https://github.com/Taure/saiten)** - eval/scoring + CI gate. Grades
-  the review swarm against a planted-bug benchmark (`banto_review_eval`).
+  the review swarm against a planted-bug benchmark (`banto_review_eval`) with a
+  self-consistency judge, JUnit output, and an optional regression gate.
 
 ## How it fits together
 
 ```
-banto_indexer    walk a repo -> chunk -> embed (banto_embedder/sekisho) -> bunko
-banto_knowledge  recall from bunko -> synthesise via gakudan_llm (sekisho)
-banto_mcp_*      madoguchi tools: recall / ask / index_repo
+banto_indexer    walk a repo -> chunk -> batch-embed (cached) -> bunko remember_many
+banto_knowledge  hybrid recall from bunko (DB repo filter + distance threshold)
+                 -> synthesise via a resilient gakudan_llm (retry/fallback, sekisho)
+banto_mcp_*      madoguchi tools (recall/ask/index_repo, annotated) + repo
+                 resources, over HTTP or stdio (banto_cli mcp-stdio)
+banto_review     fanout swarm; reviewers emit schema-constrained structured findings
+banto_review_eval saiten gate: self-consistency judge + JUnit + optional regression
 banto_config     all wiring from the `banto` app env (offline stub defaults)
 ```
 
 All repos share one bunko namespace; each memory carries `repo`/`path`/`kind`
-metadata, so recall spans every repo and a `repo` filter narrows it.
+metadata, so recall spans every repo and a `repo` filter (pushed into the DB as a
+metadata filter) narrows it.
 
 ## Roadmap
 
@@ -50,6 +60,11 @@ metadata, so recall spans every repo and a `repo` filter narrows it.
   `banto_dashboard_page`) on a second cowboy listener (:8081; MCP stays on :8080):
   indexed-repo summary + live recall search via Datastar `@post`. Same stack as
   gakudan_liveboard, not Arizona.
+- **P4 (done):** adopt the pillars' new capabilities - DB-side filtered +
+  thresholded + hybrid recall (ADR 0008), resilient LLM backends (ADR 0009), MCP
+  annotations + stdio transport + repo resources (ADR 0010), review-eval
+  self-consistency judge + JUnit + regression gate (ADR 0011), structured review
+  findings, and batched cached indexing.
 
 ## Commands
 

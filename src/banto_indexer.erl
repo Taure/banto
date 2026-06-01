@@ -5,7 +5,7 @@ memory tagged with `repo`, `path`, and `kind` metadata. Re-indexing a repo first
 deletes its previous memories, so the operation is idempotent per repo.
 """.
 
--export([index/3, index/4, collect_files/1, chunk/1]).
+-export([index/3, index/4, collect_files/1, chunk/1, items/6]).
 
 -type progress() :: #{
     repo := binary(),
@@ -116,25 +116,33 @@ store_files(Ctx, Root, Name, [Path | Rest], Files, Chunks, Pos, Total, Progress)
     }),
     store_files(Ctx, Root, Name, Rest, Files1, Chunks1, Pos1, Total, Progress).
 
+%% Embed and store all of a file's chunks in one batch call: a single embedding
+%% request per file (with the content-hash cache skipping unchanged chunks on
+%% re-index), preserving the per-chunk metadata.
 store_chunks(Ctx, Name, Rel, Kind, Parts) ->
-    store_chunks(Ctx, Name, Rel, Kind, Parts, 0, 0).
+    Items = items(Name, Rel, Kind, Parts, 0, []),
+    case Items of
+        [] ->
+            0;
+        _ ->
+            case bunko:remember_many(Ctx, Items) of
+                {ok, Ids} -> length(Ids);
+                {error, _} -> 0
+            end
+    end.
 
-store_chunks(_Ctx, _Name, _Rel, _Kind, [], _Idx, Stored) ->
-    Stored;
-store_chunks(Ctx, Name, Rel, Kind, [{Part, ChunkMeta} | Rest], Idx, Stored) ->
-    Base = #{~"repo" => Name, ~"path" => Rel, ~"kind" => Kind, ~"chunk" => Idx},
-    Meta = maps:merge(Base, ChunkMeta),
-    Inc =
+items(_Name, _Rel, _Kind, [], _Idx, Acc) ->
+    lists:reverse(Acc);
+items(Name, Rel, Kind, [{Part, ChunkMeta} | Rest], Idx, Acc) ->
+    Acc1 =
         case string:trim(Part) of
             <<>> ->
-                0;
+                Acc;
             _ ->
-                case bunko:remember(Ctx, Part, Meta) of
-                    {ok, _} -> 1;
-                    {error, _} -> 0
-                end
+                Base = #{~"repo" => Name, ~"path" => Rel, ~"kind" => Kind, ~"chunk" => Idx},
+                [{Part, maps:merge(Base, ChunkMeta)} | Acc]
         end,
-    store_chunks(Ctx, Name, Rel, Kind, Rest, Idx + 1, Stored + Inc).
+    items(Name, Rel, Kind, Rest, Idx + 1, Acc1).
 
 %% --- chunking ---
 
