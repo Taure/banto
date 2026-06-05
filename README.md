@@ -95,14 +95,6 @@ and repo resources over stdio for a desktop client that launches a local server.
 CLI (`rebar3 escriptize` -> `banto_cli review|ask|recall|index|maintain|mcp-stdio`)
 and an opt-in PR-review GitHub Action are also included.
 
-## Status
-
-All phases are in: P1 (indexing, recall, ask, MCP surface), P2 (PR review swarm +
-saiten gate + CLI + GitHub Action), P3a (nightly maintenance: dependency +
-doc-drift report via `banto_maintenance`, a `maintain` CLI subcommand, a
-scheduled Action), and P3b (a Nova + Datastar memory console on `:8081` -
-indexed-repo summary + live recall search).
-
 ## License
 
 Apache-2.0.
