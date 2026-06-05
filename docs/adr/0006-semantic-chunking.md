@@ -27,7 +27,7 @@ or a schema change.
 - **Markdown strategy first** (`banto_chunk_markdown`): split on `#`..`######`
   headings into sections, each tagged `symbol => <heading>`; content before the
   first heading is an untagged preamble. **Fence-aware** - a `#` line inside a
-  ``` / ~~~ code block does not start a section. A section longer than the line
+  backtick or tilde code block does not start a section. A section longer than the line
   cap is sub-split by lines, all sharing the heading.
 - **Erlang/Elixir form strategy is deferred** to a follow-up; the seam is built
   so it drops in as another `banto_chunk` callback module.

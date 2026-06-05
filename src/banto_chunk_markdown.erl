@@ -1,7 +1,7 @@
 -module(banto_chunk_markdown).
 -moduledoc """
 Chunk Markdown into heading-bounded sections, each tagged with its heading as
-`symbol`. Fence-aware: a `#` line inside a ``` / ~~~ code fence does not start a
+`symbol`. Fence-aware: a `#` line inside a backtick or tilde code fence does not start a
 section. Content before the first heading is an untagged preamble chunk. A
 section longer than `?MAX_LINES` is sub-split by lines, all sharing the heading.
 See ADR 0006.

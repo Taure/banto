@@ -22,7 +22,7 @@ init([Name, Path]) ->
     {ok, #{repo => Name, path => Path}, {continue, run}}.
 
 handle_continue(run, #{repo := Name, path := Path} = State) ->
-    Progress = fun(P) -> banto_index_hub:report(P) end,
+    Progress = fun banto_index_hub:report/1,
     case banto_indexer:index(banto:ctx(), Path, Name, Progress) of
         {ok, _} ->
             ok;

@@ -19,8 +19,49 @@ deletes its previous memories, so the operation is idempotent per repo.
 -export_type([progress/0]).
 
 %% File types worth indexing for code/doc retrieval.
--define(EXTS, [~".erl", ~".hrl", ~".ex", ~".exs", ~".md", ~".config", ~".src", ~".app"]).
--define(SKIP_DIRS, [~"_build", ~".git", ~"deps", ~"_checkouts", ~"node_modules", ~"doc"]).
+-define(EXTS, [
+    ~".erl",
+    ~".hrl",
+    ~".ex",
+    ~".exs",
+    ~".md",
+    ~".config",
+    ~".src",
+    ~".app",
+    ~".lua",
+    ~".dart",
+    ~".ts",
+    ~".js",
+    ~".mjs",
+    ~".cs",
+    ~".cpp",
+    ~".cc",
+    ~".h",
+    ~".hpp",
+    ~".gd",
+    ~".go",
+    ~".script",
+    ~".gui_script",
+    ~".render_script"
+]).
+-define(SKIP_DIRS, [
+    ~"_build",
+    ~".git",
+    ~"deps",
+    ~"_checkouts",
+    ~"node_modules",
+    ~"doc",
+    ~"Library",
+    ~"Intermediate",
+    ~"Saved",
+    ~"Binaries",
+    ~"DerivedDataCache",
+    ~".godot",
+    ~".dart_tool",
+    ~"build",
+    ~"dist",
+    ~"vendor"
+]).
 -define(MAX_BYTES, 262144).
 -define(CHUNK_LINES, 60).
 
