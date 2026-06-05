@@ -379,6 +379,25 @@ collect_files_binary_path_test() ->
         _ = file:del_dir(Dir)
     end.
 
+%% --- banto_indexer:collect_files polyglot extensions + engine build dirs ---
+
+collect_files_polyglot_test() ->
+    Dir = filename:join("/tmp", "banto_idx_" ++ integer_to_list(erlang:unique_integer([positive]))),
+    ok = filelib:ensure_path(filename:join(Dir, "Library")),
+    Wanted = [
+        "main.lua", "client.dart", "sdk.ts", "Player.cs", "core.cpp", "node.gd", "hud.gui_script"
+    ],
+    Unwanted = ["asset.png", "data.json", filename:join("Library", "gen.cs")],
+    [ok = file:write_file(filename:join(Dir, F), ~"content") || F <- Wanted ++ Unwanted],
+    try
+        Found = [filename:basename(P) || P <- banto_indexer:collect_files(Dir)],
+        ?assertEqual(lists:sort(Wanted), lists:sort(Found))
+    after
+        [file:delete(filename:join(Dir, F)) || F <- Wanted ++ Unwanted],
+        _ = file:del_dir(filename:join(Dir, "Library")),
+        _ = file:del_dir(Dir)
+    end.
+
 %% --- banto_index_hub pub/sub ---
 
 index_hub_subscribe_and_report_test() ->
