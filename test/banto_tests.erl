@@ -85,6 +85,25 @@ embedder_parse_embedding_test() ->
 embedder_parse_embedding_bad_test() ->
     ?assertEqual({error, no_embedding}, banto_embedder:parse_embedding(~"{}")).
 
+embedder_handle_result_test() ->
+    Body = iolist_to_binary(json:encode(#{~"data" => [#{~"embedding" => [0.5]}]})),
+    ?assertEqual({ok, [0.5]}, banto_embedder:handle_result({{~"HTTP/1.1", 200, ~"OK"}, [], Body})),
+    ?assertEqual(
+        {error, {http_error, 429}},
+        banto_embedder:handle_result({{~"HTTP/1.1", 429, ~"Too Many"}, [], ~""})
+    ),
+    ?assertEqual({error, econnrefused}, banto_embedder:handle_result({error, econnrefused})).
+
+embedder_embed_refused_returns_error_test() ->
+    {ok, L} = gen_tcp:listen(0, []),
+    {ok, Port} = inet:port(L),
+    ok = gen_tcp:close(L),
+    Opts = #{
+        base_url => iolist_to_binary(["http://127.0.0.1:", integer_to_binary(Port)]),
+        api_key => ~"k"
+    },
+    ?assertMatch({error, _}, banto_embedder:embed(~"text", Opts)).
+
 %% --- banto_knowledge:recall_opts ---
 
 recall_opts_no_repo_hybrid_test() ->
