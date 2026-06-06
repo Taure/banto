@@ -20,7 +20,7 @@ gateway's OpenAI prefix.
 -behaviour(bunko_embedder).
 
 -export([embed/2]).
--export([build_body/2, parse_embedding/1]).
+-export([build_body/2, parse_embedding/1, handle_result/1]).
 
 -define(DEFAULT_MODEL, ~"text-embedding-3-small").
 -define(TIMEOUT, 30_000).
@@ -33,13 +33,38 @@ embed(Text, #{base_url := BaseUrl, api_key := ApiKey} = Opts) ->
     Headers = [{"x-api-key", binary_to_list(ApiKey)}],
     Request =
         {Url, Headers, "application/json", iolist_to_binary(json:encode(build_body(Model, Text)))},
-    case httpc:request(post, Request, [{timeout, ?TIMEOUT}], [{body_format, binary}]) of
-        {ok, {{_, 200, _}, _Hdrs, RespBody}} -> parse_embedding(RespBody);
-        {ok, {{_, Code, _}, _Hdrs, _Body}} -> {error, {http_error, Code}};
-        {error, Reason} -> {error, Reason}
+    %% Async + caller-side receive: httpc's sync mode parks the caller in
+    %% httpc:handle_answer/5, and if the request handler dies without replying
+    %% the {timeout, _} http option never fires - the caller wedges forever
+    %% (observed stalling a whole index sweep). The `after` clause is our
+    %% timeout of last resort regardless of handler fate.
+    HttpOpts = [{timeout, ?TIMEOUT}, {connect_timeout, ?TIMEOUT}],
+    ReqOpts = [{body_format, binary}, {sync, false}, {receiver, self()}],
+    case httpc:request(post, Request, HttpOpts, ReqOpts) of
+        {ok, ReqId} ->
+            receive
+                {http, {ReqId, Result}} -> handle_result(Result)
+            after ?TIMEOUT + 5000 ->
+                _ = httpc:cancel_request(ReqId),
+                flush_answer(ReqId),
+                {error, timeout}
+            end;
+        {error, Reason} ->
+            {error, Reason}
     end;
 embed(_Text, _Opts) ->
     {error, {bad_config, missing_base_url_or_api_key}}.
+
+handle_result({{_, 200, _}, _Hdrs, RespBody}) -> parse_embedding(RespBody);
+handle_result({{_, Code, _}, _Hdrs, _Body}) -> {error, {http_error, Code}};
+handle_result({error, Reason}) -> {error, Reason}.
+
+%% A late answer racing cancel_request must not pollute the caller's mailbox.
+flush_answer(ReqId) ->
+    receive
+        {http, {ReqId, _}} -> ok
+    after 0 -> ok
+    end.
 
 -doc "Build the OpenAI embeddings request body (pure).".
 -spec build_body(binary(), binary()) -> map().
