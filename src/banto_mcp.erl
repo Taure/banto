@@ -10,10 +10,17 @@ desktop client.
 
 -export([start/0, start_stdio/0, server/0]).
 
--doc "Start the madoguchi MCP HTTP server on the configured port at `/mcp`.".
+-doc """
+Start the madoguchi MCP HTTP server on the configured port at `/mcp`, bound to
+all interfaces so it is reachable through a container's published port or a
+platform router (madoguchi defaults to loopback only).
+""".
 -spec start() -> {ok, pid()} | {error, term()}.
 start() ->
-    madoguchi:start_http(server(), #{port => banto_config:mcp_port(), path => "/mcp"}).
+    madoguchi:start_http(
+        server(),
+        #{port => banto_config:mcp_port(), path => "/mcp", ip => {0, 0, 0, 0}}
+    ).
 
 -doc """
 Serve the MCP protocol over stdin/stdout until EOF. The entry point for running
